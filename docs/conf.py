@@ -42,10 +42,10 @@ extensions = [
     "sphinx_rtd_theme",
     'sphinx.ext.autosectionlabel',
     "sphinxcontrib.napoleon",
-    "sphinx-prompt",
+#    "sphinx-prompt",
     'sphinx_substitution_extensions',
     "sphinx.ext.ifconfig",
-    'sphinxcontrib.mermaid',
+#    'sphinxcontrib.mermaid',
 ]
 
 # -- Project information -----------------------------------------------------
