@@ -19,8 +19,10 @@ Creating the Test PKI (Optional)
 
 See :ref:`PKI Requirements` for an overview of how |prod| uses TLS with digital certificates.
 
-This section explains how to use some convenience open-ssl scripts to generate a test PKI. **See the disclaimer in :ref:`PKI Requirements` for these methods are unsuitable for production use!**
+This section explains how to use some convenience open-ssl scripts to generate a test PKI. 
 
+**NOTE: Proper consideration needs to be taken when deploying Open Federated Learning.  The scripts that create the custom PKI for the project do not have a mechanism to sign any of the certificates by a proper Certificate Authority.  The CA certificate that is created will only be self-signed.  Trust in this certificate therefore will be based on your abilty to propertly secure the private key for that certificate, as well as securely distribute the CA Certificate to your endpoints.**
+   
 **Use these scripts at your own risk.** 
 
 
