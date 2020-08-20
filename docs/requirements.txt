@@ -11,6 +11,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-sphinx_rtd_theme
-sphinxcontrib.napoleon
+sphinx-prompt
+sphinx-rtd-theme
+Sphinx-Substitution-Extensions
+sphinxcontrib-applehelp
+sphinxcontrib-devhelp
+sphinxcontrib-htmlhelp
+sphinxcontrib-jsmath
+sphinxcontrib-mermaid
+sphinxcontrib-napoleon
+sphinxcontrib-qthelp
+sphinxcontrib-serializinghtml
+sphinxcontrib-websupport
