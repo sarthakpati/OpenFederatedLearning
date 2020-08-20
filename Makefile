@@ -29,10 +29,10 @@ python_minor_version := $(shell python3 -c 'import sys; print(sys.version_info.m
 .PHONY: uninstall_openfl_tensorflow
 .PHONY: reinstall
 .PHONY: clean
-.PHONE: openfl_whl
-.PHONE: openfl_pytorch_whl
-.PHONE: openfl_tensorflow_whl
-.PHONE: fets_whl
+.PHONY: openfl_whl
+.PHONY: openfl_pytorch_whl
+.PHONY: openfl_tensorflow_whl
+.PHONY: fets_whl
 
 # FIXME: some real makefile fu could probably make this all easier
 
