@@ -1,5 +1,7 @@
 # Welcome to OpenFL
 
+See the documentation at: https://openfederatedlearning.readthedocs.io/en/latest/index.html
+
 Open Federated Learning (OpenFL) is a Python3 library for federated learning. Federated learning enables organizations to collaborately train a machine learning model without sharing sensitive data with each other.
 
 OpenFL currently supports two main types of nodes:
