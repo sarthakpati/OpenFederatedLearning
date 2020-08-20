@@ -18,19 +18,9 @@ Digital Certificates and PKI Requirements
 *****************************************
 By default, |productName| uses the TLS protocol to secure all network connections.
 
-.. note::
-   This section has been temporarily removed. It will be back up very soon.
+**NOTE: Proper consideration needs to be taken when deploying Open Federated Learning.  The scripts that create the custom PKI for the project do not have a mechanism to sign any of the certificates by a proper Certificate Authority.  The CA certificate that is created will only be self-signed.  Trust in this certificate therefore will be based on your abilty to propertly secure the private key for that certificate, as well as securely distribute the CA Certificate to your endpoints.**
 
-.. comments
-
-   This is all commented out pending final review of text. 
-
-   **<DRAFT_DISCLAIMER>**  
-
-   **NOTE: Proper consideration needs to be taken when deploying Open Federated Learning in a production environment.  Due to the research nature of this project, Intel does not provide any mechanism to acquire digital certificates for the aggregator or collaborator endpoints.**
-   
-   **If your intention is to deploy Open Federated Learning in a production environment, it is your responsibility to properly create and secure the private keys for your endpoint as well as aquire properly signed digital certificates from a trusted CA vendor.**
-   **<DRAFT_DISCLAIMER>** 
+**Use at your own risk.**
 
    Collaborator-to-Aggregator TLS
    ##############################
@@ -57,11 +47,6 @@ By default, |productName| uses the TLS protocol to secure all network connection
 Single Collaborator Cert Common Name Mode for testing
 #####################################################
    
-.. note::
-   This section has been temporarily removed. It will be back up very soon.
-
-.. comments
-
    |productName| provides a convenience option called "Single Collaborator Cert Common Name" (SCN) mode that allows developers/testers to re-use the same collaborator certificate for each collaborator.
    **This should only be use in fully trusted test environments on the same trusted network, and should never be used if any nodes are not under direct control of the tester/developer!**
    Normally, the aggregator checks the cert to ensure that the collaborator name matches the common name in the certificate.
