@@ -42,7 +42,6 @@ extensions = [
     "sphinx_rtd_theme",
     'sphinx.ext.autosectionlabel',
     "sphinxcontrib.napoleon",
-    "rinoh.frontend.sphinx",
     "sphinx-prompt",
     'sphinx_substitution_extensions',
     "sphinx.ext.ifconfig",
@@ -76,8 +75,6 @@ rst_prolog = """
 
 .. _Makefile: https://github.com/IntelLabs/OpenFederatedLearning/blob/master/Makefile
 """
-
-rinoh_documents = [('index', u'open_fl_manual', u'Open Federated Learning Manual', u'FeTS')]
 
 napoleon_google_docstring = True
 
