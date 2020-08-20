@@ -1,0 +1,68 @@
+# Copyright (C) 2020 Intel Corporation
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: 1
+
+formatters:
+  simple:
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  error:
+    format: "%(levelname)s <PID %(process)d:%(processName)s> %(name)s.%(funcName)s(): %(message)s"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: simple
+    stream: ext://sys.stdout
+  agg_file_handler:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: simple
+    filename: aggregator.log
+    maxBytes: 10000000
+    backupCount: 20
+    encoding: utf8
+  col_file_handler:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: simple
+    filename: collaborator.log
+    maxBytes: 10000000
+    backupCount: 20
+    encoding: utf8
+  inference_file_handler:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: simple
+    filename: inference.log
+    maxBytes: 10000000
+    backupCount: 20
+    encoding: utf8
+
+loggers:
+  openfl.aggregator:
+    level: DEBUG
+    handlers: [console, agg_file_handler]
+    propagate: yes
+  openfl.collaborator:
+    level: DEBUG
+    handlers: [console, col_file_handler]
+    propagate: yes
+  inference:
+    level: DEBUG
+    handlers: [console, inference_file_handler]
+    propagate: yes
+  root:
+    level: DEBUG
+    handlers: [console]

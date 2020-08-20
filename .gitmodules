@@ -1,0 +1,3 @@
+[submodule "submodules/fets_ai/Algorithms"]
+	path = submodules/fets_ai/Algorithms
+	url = https://github.com/FETS-AI/Algorithms.git

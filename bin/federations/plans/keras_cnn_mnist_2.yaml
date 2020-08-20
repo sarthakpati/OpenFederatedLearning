@@ -1,0 +1,54 @@
+# Copyright (C) 2020 Intel Corporation
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Compose an FL plan in YAML
+# The plan is consumed by bin/run_simulation_from_flplan.py,
+# bin/run_aggregator_from_flplan, bin/run_collaborator_from_flplan, and
+# bin/create_initial_weights_file_from_plan.py
+
+aggregator_object_init:
+  init_kwargs:
+    best_model_fname: keras_cnn_mnist_best.pbuf
+    init_model_fname: keras_cnn_mnist_init.pbuf
+    latest_model_fname: keras_cnn_mnist_latest.pbuf
+    rounds_to_train: 6
+    end_of_round_metadata:
+      - aggregation_time
+      - participant_training_data_size
+    init_metadata_fname   : keras_cnn_mnist_metadata_init.yaml
+    latest_metadata_fname : keras_cnn_mnist_metadata_latest.yaml
+    send_metadata_to_clients: true
+
+collaborator_object_init:
+  init_kwargs:
+    epochs_per_round: 1.0
+    opt_treatment: RESET
+    polling_interval: 4
+    send_model_deltas: false
+    save_metadata_path: keras_cnn_mnist_metadata.yaml
+
+data_object_init:
+  class_to_init: openfl.data.tensorflow.tfmnist_inmemory.TensorFlowMNISTInMemory
+  data_name_in_local_config: mnist_shard
+  init_kwargs:
+    batch_size: 256
+    nb_collaborators: 2
+
+model_object_init:
+  class_to_init: openfl.models.tensorflow.keras_cnn.keras_cnn.KerasCNN
+
+network_object_init:
+  defaults_file: defaults/network.yaml
+
+inference:
+  allowed: True

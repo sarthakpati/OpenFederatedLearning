@@ -1,0 +1,135 @@
+// Copyright (C) 2020 Intel Corporation
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = 'proto3';
+
+package openfl_proto;
+
+// we start with everything as "required" while developing / debugging. This forces correctness better.
+// FIXME: move to "optional" once development is complete
+
+service Aggregator {
+    rpc RequestJob(JobRequest) returns (JobReply) {}
+    rpc DownloadModel(ModelDownloadRequest) returns (stream DataStream) {}
+    rpc UploadLocalModelUpdate(stream DataStream) returns (LocalModelUpdateAck) {}
+    rpc UploadLocalMetricsUpdate(LocalValidationResults) returns (LocalValidationResultsAck) {}
+}
+
+// handles large size data
+message DataStream {
+	uint32 size = 1; // size, in bytes, of the data sent in npbytes
+	bytes npbytes = 2; // actual data
+}
+
+enum Job {
+    JOB_TRAIN = 0;
+    JOB_VALIDATE = 1;
+    JOB_YIELD = 2;
+    JOB_QUIT = 3;
+    JOB_DOWNLOAD_MODEL = 4;
+}
+
+message MetadataProto {
+    map<int32, float> int_to_float = 1;
+    repeated int32 int_list = 2;
+    repeated bool bool_list = 3;
+}
+
+message TensorProto {
+    string name = 1;
+    bytes data_bytes = 3; 
+    repeated MetadataProto transformer_metadata = 4;
+}
+
+// Everything but 'sender' is effectively just for sanity checking during testing
+message MessageHeader {
+    string sender = 1;
+    string recipient = 2;
+    string federation_id = 3;
+    // FIXME: really a nonce
+    int32 counter = 4; // FIXME: better sanity check device?
+    string single_col_cert_common_name = 5;
+}
+
+message ModelHeader {
+    string id = 1;
+    bool is_delta = 2;
+    int32 delta_from_version = 3;
+    // FIXME: is this version or rounds trained? We need to know rounds trained somewhere, and this currently does track that
+    int32 version = 4;
+}
+
+message ModelProto {
+    ModelHeader header = 1;
+    repeated TensorProto tensors = 2;
+    
+}
+
+
+// COLLABORATOR MESSAGES
+
+message LocalModelUpdate {
+    MessageHeader header = 1;
+    ModelProto model = 2;
+    int32 data_size = 3;
+    // map<string, float> loss = 4;
+    float loss = 4;
+}
+
+
+message LocalValidationResults {
+    MessageHeader header = 1;
+    ModelHeader model_header = 2;
+    // Python Dictionary
+    // map<string, float> results = 3;
+    float results =3;
+    int32 data_size = 4;
+}
+
+message JobRequest {
+    MessageHeader header = 1;
+    ModelHeader model_header = 2;
+}
+
+message ModelDownloadRequest {
+    MessageHeader header = 1;
+    ModelHeader model_header = 2;
+}
+
+message RoundTaskQuery {
+    MessageHeader header = 1;
+    map<string, int32> task_results_last_sync = 2;
+}
+
+// AGGREGATOR MESSAGES
+
+message GlobalModelUpdate {
+    MessageHeader header = 1;
+    ModelProto model = 2;
+    bool is_global_best = 3;
+    string metadata_yaml = 4;
+}
+
+
+message JobReply {
+    MessageHeader header = 1;
+    Job job = 2;
+}
+
+message LocalModelUpdateAck {
+    MessageHeader header = 1;
+}
+
+message LocalValidationResultsAck {
+    MessageHeader header = 1;
+}

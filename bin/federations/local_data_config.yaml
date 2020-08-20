@@ -1,0 +1,106 @@
+# Copyright (C) 2020 Intel Corporation
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# all keys under 'collaborators' corresponds to a specific colaborator name
+# the corresponding dictionary has data_name, data_path pairs. Note
+# that in the mnist case we do not store the data locally, and
+# the data_path is used to pass an integer that helps the data object construct
+# the shard of the mnist dataset to be use for this collaborator.
+
+collaborators:
+  col_one_big:
+    brats: '<symlink_dir>/0-9'
+  col_0:
+    brats: '<symlink_dir>/0'
+    mnist_shard: 0
+    cifar10_shard: 0
+  col_1:
+    brats: '<symlink_dir>/1'
+    mnist_shard: 1
+    cifar10_shard: 1
+  col_2:
+    brats: '<symlink_dir>/2'
+    mnist_shard: 2
+    cifar10_shard: 2
+  col_3:
+    brats: '<symlink_dir>/3'
+    mnist_shard: 3
+    cifar10_shard: 3
+  col_4:
+    brats: '<symlink_dir>/4'
+    mnist_shard: 4
+    cifar10_shard: 4
+  col_5:
+    brats: '<symlink_dir>/5'
+    mnist_shard: 5
+    cifar10_shard: 5
+  col_6:
+    brats: '<symlink_dir>/6'
+    mnist_shard: 6
+    cifar10_shard: 6
+  col_7:
+    brats: '<symlink_dir>/7'
+    mnist_shard: 7
+    cifar10_shard: 7
+  col_8:
+    brats: '<symlink_dir>/8'
+    mnist_shard: 8
+    cifar10_shard: 8
+  col_9:
+    brats: '<symlink_dir>/9'
+    mnist_shard: 9
+    cifar10_shard: 9
+  col_10:
+    brats: '<symlink_dir>/0'
+  col_11:
+    brats: '<symlink_dir>/1'
+  col_12:
+    brats: '<symlink_dir>/2'
+  col_13:
+    brats: '<symlink_dir>/3'
+  col_14:
+    brats: '<symlink_dir>/4'
+  col_15:
+    brats: '<symlink_dir>/5'
+  col_16:
+    brats: '<symlink_dir>/6'
+  col_17:
+    brats: '<symlink_dir>/7'
+  col_18:
+    brats: '<symlink_dir>/8'
+  col_19:
+    brats: '<symlink_dir>/9'
+  col_20:
+    brats: '<symlink_dir>/0'
+  col_21:
+    brats: '<symlink_dir>/1'
+  col_22:
+    brats: '<symlink_dir>/2'
+  col_23:
+    brats: '<symlink_dir>/3'
+  col_24:
+    brats: '<symlink_dir>/4'
+  col_25:
+    brats: '<symlink_dir>/5'
+  col_26:
+    brats: '<symlink_dir>/6'
+  col_27:
+    brats: '<symlink_dir>/7'
+  col_28:
+    brats: '<symlink_dir>/8'
+  col_29:
+    brats: '<symlink_dir>/9'
+  col_30:
+    brats: '<symlink_dir>/0'
+  col_31:
+    brats: '<symlink_dir>/1'
