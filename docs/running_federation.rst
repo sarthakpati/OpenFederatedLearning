@@ -12,16 +12,15 @@
 .. # limitations under the License.
 
 
-***********************
-Running a Federation
-***********************
+************************************
+Running a Federation (MNIST Example)
+************************************
 
 
 We will be training an MNIST classifier using federated learning and two collaborators. We will use an flplan (keras_cnn_mnist_2.yaml) already provided in the repo inside /bin/federations/plans, as well as a provided collaborators list file (cols_2.yaml inside /bin/federations/collaborator_lists) containing two collaborator names, 'col_0' and 'col_1'. Both collaborator names are already provided in the default local_data_config file so that the framework can locate the collaborator specific data information (which in this case consists of a shard number to use for hard-coded sharding logic that is performed after grabbing MNIST from a hard coded online location).
 
 .. toctree::
 
-   running_federation.configure_aggregator
-   running_federation.running_aggregator
-   running_federation.configure_collaborator
-   running_federation.running_collaborator
+   running_federation.configure
+   running_federation.run
+   

@@ -19,8 +19,8 @@ This section walks you through configuring one or more machines to run test fede
 
 Prerequisites:
 
-1. In root directory of |prod| repository
-2. You know the fully-qualified domain name or IP address of the machine you want to use as your aggregator. For example, you can use the following linux/cygwin command:
+1. Clone the |prod| repository, and navigate to the root directory.
+2. Determine the fully-qualified domain name or IP address of the machine you want to use as your aggregator. For example, you can use the following linux/cygwin command:
 
 
 .. code-block:: console
@@ -34,9 +34,9 @@ Setting Defaults for Network settings
 
 FL Plans support default configurations to make it easier to share settings between FL Plans. This also makes it easier to customize another's plan without changing the main plan file, so you can share plans with other developers.
 
-The sample plans included with |prod| all depend on a defaults file for their network configurations. This allows a developer to set their network configuration for one spot for their various test plans.
+The sample plans included with |prod| all depend on a defaults file for their network configurations. This allows a developer a single location in which to set their network configuration for their various test plans.
 
-We include an example under bin/federations/plans/defaults/network.yaml.example that you can copy then edit to be set it to be specific to you. Let's do this now:
+We include an example under bin/federations/plans/defaults/network.yaml.example that you can copy into the default filename for this configuation, then edit to your specification. Let's do this now:
 
 1. First, we need to copy the example file that we're going to change. Copy it and take a look at it:
 
@@ -117,14 +117,15 @@ And you'll see that they have very exciting contents, such as:
       - 'col_8'
       - 'col_9'
 
-In a real setting, these lists would hold the common names in the certificates the collaborators (one per cert). In a development/test environment, feel free to use any naming-convention. You will need these names later, so we recommend keeping them simple. Note that you may want to run multiple collaborators on a single machine, so you may not want to use machine names here. (TODO: Add reference to auto-lists when we implement that convenience feature).
+In a real setting, these lists would hold the common names in the certificates of the collaborators (one per cert). In a development/test environment, feel free to use any naming-convention. You will need these names later, so we recommend keeping them simple. Note that you may want to run multiple collaborators on a single machine, so you may not want to use machine names here. (TODO: Add reference to auto-lists when we implement that convenience feature).
 
 Configuring Collaborator Local Data Directories
 #########
 
-When a collaborator executes an FL Plan, the FL Plan will contain a data_name entry such as "brats" or "mnist_shard" or similar. This name serves as a key in a dictionary of paths or shards on the collaborator (we use "shards" to refer to tests where a single data is split among collaborators at runtime, i.e. "sharded"). We store these mappings in .yaml files of a structure:
+When a collaborator executes an FL Plan, the FL Plan will contain a data_name entry such as "brats" or "mnist_shard" or similar. This name serves as a key in a dictionary of paths or shards on the collaborator (we use "shards" to refer to tests where a single dataset is split among collaborators at runtime, i.e. "sharded"). We store these mappings in .yaml files of a structure:
 
 .. code-block:: console
+
     collaborator_common_name:
         data_name: <path or shard>
 

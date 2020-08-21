@@ -20,7 +20,7 @@ Installation
 1. The core |prod| packages require no machine learning frameworks (all numpy-based). This includes the logic for the aggregagtor, collaborator, network, and model/data interfaces.
 2. The |pt| packages for model and data baseclasses to simplify porting |pt| models to |prod|. (Optional)
 3. The |tf| packages for model and data baseclasses to simplify porting |tf| models to |prod|. (Optional)
-4. The |fets| packages, as a submodule, that contain the |fets| model and data classes. (Optional, requires submodule init)
+4. The |fets| packages, as a submodule, that contains the |fets| model and data classes. (Optional, requires submodule init)
 
 Our scripts create a Python 3 virtual environment at ./venv which we use to run our python scripts. You can use the make file to either install these packages in this virtual-environment, or to create wheel files for you to install in another environment.
 
@@ -108,4 +108,4 @@ If you want to install |prod| and related optional packages in another Python3 e
 
 
 .. note::
-   Running |prod| in containers (e.g. Docker, Singularity) is natural solution to simplify deployment, and fairly straight-forward. We welcome 
+   Running |prod| in containers (e.g. Docker, Singularity) is natural solution to simplify deployment, and fairly straight-forward. We welcome contributions towards such a solution. 

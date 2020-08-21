@@ -11,17 +11,17 @@
 .. # See the License for the specific language governing permissions and
 .. # limitations under the License.
 
-Tutorial: MNIST Classifier Federation Simulation
+Running a Federation Simulation (MNIST Example)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For this example, we will use an example flplan (bin/federations/plans/keras_cnn_mnist_10.yaml) that will work in conjunction with an example collaborators list (bin/federations/collaborator_lists/cols_10.yaml) for which entries already exist in the example local data config (bin/federations/local_data_config.yaml) enabling a predetermined sharding of the MNIST public dataset across 10 collaborators.
+Here we will use an example flplan (bin/federations/plans/keras_cnn_mnist_10.yaml) that will work in conjunction with an example collaborators list (bin/federations/collaborator_lists/cols_10.yaml) for which entries already exist in the example local data config (bin/federations/local_data_config.yaml) enabling a predetermined sharding of the MNIST public dataset across 10 collaborators.
 
 Setup and Installation
 ----------------------
 
 1. Clone the repository onto a linux machine the has Python 3.5 or greater, and the virtualenv library installed.
 
-2. Enter the top level directory of our project, and install the project with support for Keras models.
+2. Enter the project root directory, and install the project with support for Keras models.
 
 .. code-block:: console
 
@@ -41,7 +41,7 @@ Creation of Initial Weights
 
 .. code-block:: console
 
-  $ ../venv/bin/python create_initial_weights_file_from_flplan.py -p <keras_cnn_mnist_10.yaml> -c <cols_10.yaml>
+  $ ../venv/bin/python create_initial_weights_file_from_flplan.py -p keras_cnn_mnist_10.yaml -c cols_10.yaml
   
   
 Launch the Simulated Federation
@@ -51,7 +51,7 @@ Launch the Simulated Federation
 
 .. code-block:: console
 
-  $ ../venv/bin/python run_simulation_from_flplan.py -p <keras_cnn_mnist_10.yaml> -c <cols_10.yaml>
+  $ ../venv/bin/python run_simulation_from_flplan.py -p keras_cnn_mnist_10.yaml -c cols_10.yaml
 
 Monitor the Progress
 --------------------

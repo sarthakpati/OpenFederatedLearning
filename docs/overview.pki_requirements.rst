@@ -53,7 +53,7 @@ Single Collaborator Cert Common Name Mode for testing
    This mode allows a collaborator node to masquerade as any collaborator by instead instructing the aggregator to check that the common name in the cert matches a specific name given to it when launched.
    Therefore, the collaborator process can claim any name it wishes, so long as it presents a certificate with that specific common name.
    This is especially useful for a test environment where collaborator nodes may run on different machines at different times.
-   (Note that in SCN mode, the collaborator name must be in the approved list. The collaborator name just doesn't have to match the CN in the cert is uses).
+   (Note that in SCN mode, the collaborator name must be in the approved list. The collaborator name just doesn't have to match the CN in the cert it uses).
 
    To enable SCN mode, pass -scn <common name> to **each** process in the federation.
 
@@ -64,7 +64,7 @@ Single Collaborator Cert Common Name Mode for testing
    Disabling TLS
    #############
 
-   Finally, it is possible to disable TLS entirely. **Do this at your own risk**. In the <TODO: link network configuration section> section, you will see a "disable_tls" configuration option. 
+   Finally, it is possible to disable TLS entirely. **Do this at your own risk**. In the :ref:`network_defaults` section, you will see a "disable_tls" configuration option. 
 
    .. note::
 
