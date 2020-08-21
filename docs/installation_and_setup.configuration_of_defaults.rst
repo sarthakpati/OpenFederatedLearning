@@ -11,9 +11,9 @@
 .. # See the License for the specific language governing permissions and
 .. # limitations under the License.
 
-**************************
+***************************************
 Configuring a Development/Testing Setup
-**************************
+***************************************
 
 This section walks you through configuring one or more machines to run test federations for testing/development.
 
@@ -30,7 +30,7 @@ Prerequisites:
 .. _network_defaults:
 
 Setting Defaults for Network settings
-#########
+#####################################
 
 FL Plans support default configurations to make it easier to share settings between FL Plans. This also makes it easier to customize another's plan without changing the main plan file, so you can share plans with other developers.
 
@@ -85,7 +85,7 @@ Now your FL Plans will use your aggregator machine, and if it is shared, you sho
 
 
 Creating Collaborator Lists
-#########
+###########################
 
 When an aggregator executes an FL Plan, it also requires a list of collaborator names that are allowed to participate. In a production setting, these names are meaningful and are tightly coupled with each client's digital certificate used in the TLS connection. However, for test environments, you can name them whatever you wish (you will be passing these on the collaborator commandlines). You can find existing test lists under:
 
@@ -120,7 +120,7 @@ And you'll see that they have very exciting contents, such as:
 In a real setting, these lists would hold the common names in the certificates of the collaborators (one per cert). In a development/test environment, feel free to use any naming-convention. You will need these names later, so we recommend keeping them simple. Note that you may want to run multiple collaborators on a single machine, so you may not want to use machine names here. (TODO: Add reference to auto-lists when we implement that convenience feature).
 
 Configuring Collaborator Local Data Directories
-#########
+###############################################
 
 When a collaborator executes an FL Plan, the FL Plan will contain a data_name entry such as "brats" or "mnist_shard" or similar. This name serves as a key in a dictionary of paths or shards on the collaborator (we use "shards" to refer to tests where a single dataset is split among collaborators at runtime, i.e. "sharded"). We store these mappings in .yaml files of a structure:
 

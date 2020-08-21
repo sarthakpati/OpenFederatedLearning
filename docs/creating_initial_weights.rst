@@ -14,9 +14,9 @@
 
 .. _create_initial_weights:
 
-***********************
+************************
 Creating Initial Weights
-***********************
+************************
 
 At the start of federated training, the aggregator shares the initial global model with all collaborators to use for their model initializations.
 Collaborator model state is held locally in the form of a 'tensor dictionary', providing a map of parameter names to numpy array values. These tensor dictionaries are split by our framework code (using default logic, which can be changed via the flplan) into a portion for global sharing (parameters to be aggregation for example) and a portion for holding-out from sharing. The shared portion is converted into a protobuf file for serialization, in order to be sent over the network or saved to file. The initial weights file is such a file, holding the initial global state of the model to be used for a particular federation. 

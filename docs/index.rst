@@ -42,7 +42,6 @@ Pytorch.
    :caption: Contents:
 
    manual
-   openfl
 
 
 Indices and tables
