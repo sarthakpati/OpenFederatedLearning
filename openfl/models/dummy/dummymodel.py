@@ -45,13 +45,13 @@ class DummyModel(FLModel):
         self.val_time_mean = val_time_mean
         self.val_time_std = val_time_std
 
-    def train_batches(self):
+    def train_batches(self, **kwargs):
         """For this dummy model just randomly sleep for a few seconds
         """
         self.random_sleep(self.train_time_mean, self.train_time_std)
         return np.random.random()
 
-    def validate(self):
+    def validate(self, **kwargs):
         """For this dummy model just randomly sleep for a few seconds
         """
         self.random_sleep(self.val_time_mean, self.val_time_std)
