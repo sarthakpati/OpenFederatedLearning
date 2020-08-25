@@ -77,5 +77,5 @@ Note that aggregator.log is always appended to, so will include results from pre
 Explore Modifications
 ----------------------
 
-7. Edit the plan and related files to train for more rounds, more collaborators etc.
+7. Perform a new simulation using 32 collaborators instead of 10 (using the plan, 'keras_cnn_mnist_32.yaml') to see how this effects the learning curve. Explore further modifications by copying and editing existing plans.
 
