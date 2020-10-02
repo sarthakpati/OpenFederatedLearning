@@ -217,10 +217,7 @@ class Aggregator(object):
         return self.num_collaborators_done() >= self.minimum_reporting
 
     def straggler_cutoff_check(self):
-        """Determines if a collaborator is finished a round.
-
-        Args:
-            c: Collaborator name
+        """Determines if we will end the round now, cutting off any remaining stragglers.
 
         Returns:
             bool: True if collaborator c is done.
@@ -233,10 +230,10 @@ class Aggregator(object):
         return cutoff
 
     def end_of_round_check(self):
-        """Determines if it is the end of a training round.
+        """Determines if it is the end of a training round, if so calling method to perform end of round operations.
 
         Returns:
-            bool: True if training round has ended.
+            None
 
         """
         # FIXME: find a nice, clean way to manage these values without having to manually ensure
