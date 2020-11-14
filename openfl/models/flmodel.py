@@ -205,11 +205,11 @@ class FLModel(object):
                 else:
                     features = sample
                 metadata = None
-            outputs = self.infer_batch(features)
+            outputs = self.infer_volume(features)
             ret.append(self.data.write_outputs(outputs, metadata, **kwargs))
         return ret
     
-    def infer_batch(self, X):
+    def infer_volume(self, X):
         """Runs inference on a batch and returns the output of the model.
 
         Args:
