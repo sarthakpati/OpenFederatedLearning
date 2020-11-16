@@ -24,23 +24,23 @@ from setup_logging import setup_logging
 
 
 
-def main(plan, fetsai_model_weights_filename, fetsai_native_model_weights_filepath, data_dir, logging_config_path, logging_default_level, logging_directory, model_device):
+def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, logging_config_path, logging_default_level, logging_directory, model_device):
     """Runs the inference according to the flplan, data-dir and weights file. The assumption here is that the model instantiation
     includes population of model weights (thus a model weights file must be indicated)
     The inference output format is determined by the data object in the flplan
 
     Args:
-        plan (string)                           : The filename for the federation (FL) plan YAML file
-        fetsai_model_weights_filename (string)  : A .pbuf filename in the common weights directory (mutually exclusive with native_model_weights_filepath). NOTE: these must be uncompressed weights!!
-        fetsai_native_model_weights_filepath    : A framework-specific filepath. Path will be relative to the working directory. (mutually exclusive with model_weights_filename)
-        data_dir (string)                       : The directory path for the parent directory containing the data. Path will be relative to the working directory.
-        logging_config_fname (string)           : The log file
-        logging_default_level (string)          : The log level
+        plan (string)                    : The filename for the federation (FL) plan YAML file
+        model_weights_filename (string)  : A .pbuf filename in the common weights directory (mutually exclusive with native_model_weights_filepath). NOTE: these must be uncompressed weights!!
+        native_model_weights_filepath    : A framework-specific filepath. Path will be relative to the working directory. (mutually exclusive with model_weights_filename)
+        data_dir (string)                : The directory path for the parent directory containing the data. Path will be relative to the working directory.
+        logging_config_fname (string)    : The log file
+        logging_default_level (string)   : The log level
 
     """
 
-    if fetsai_model_weights_filename is not None and fetsai_native_model_weights_filepath is not None:
-        sys.exit("Parameters fetsai_model_weights_filename and fetsai_native_model_weights_filepath are mutually exclusive.\nmodel_weights_file was set to {}\native_model_weights_filepath was set to {}".format(fetsai_model_weights_filename, fetsai_native_model_weights_filepath))
+    if model_weights_filename is not None and native_model_weights_filepath is not None:
+        sys.exit("Parameters model_weights_filename and native_model_weights_filepath are mutually exclusive.\nmodel_weights_file was set to {}\native_model_weights_filepath was set to {}".format(model_weights_filename, native_model_weights_filepath))
 
     # FIXME: consistent filesystem (#15)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -60,16 +60,16 @@ def main(plan, fetsai_model_weights_filename, fetsai_native_model_weights_filepa
         sys.exit("FL Plan must contain a {'inference: {'allowed': True}} entry in order for inference to be allowed.")
 
     if fets-ai_model_weights_filename is not None and fets-ai_native_model_weights_filepath is not None:
-        sys.exit('Arguments: fets-ai_model_weights_filename (provided as {}) and fets-ai_native_model_weights_filepath (provided as {}) are mutually exclusive'.format(fets-ai_model_weights_filename, fets-ai_native_model_weights_filepath))
+        sys.exit('Arguments: model_weights_filename (provided as {}) and native_model_weights_filepath (provided as {}) are mutually exclusive'.format(model_weights_filename, native_model_weights_filepath))
 
     # This script expects the model to populate its weights upon initialization.
     # Supplementing the flplan model init kwargs to include model weights file info.
-    if fets-ai_model_weights_filename is not None:
-        flplan['model_object_init']['init_kwargs'].update({'model_weights_filename': fetsai_model_weights_filename})
-    elif fets-ai_native_model_weights_filepath is not None:
-        flplan['model_object_init']['init_kwargs'].update({'native_model_weights_filepath': fets-ai_native_model_weights_filepath})
+    if model_weights_filename is not None:
+        flplan['model_object_init']['init_kwargs'].update({'model_weights_filename': model_weights_filename})
+    elif native_model_weights_filepath is not None:
+        flplan['model_object_init']['init_kwargs'].update({'native_model_weights_filepath': native_model_weights_filepath})
     else:
-        sys.exit('One of the arguments: fets-ai_model_weights_filename or fets-ai_native_model_weights_filepath must be provided.')
+        sys.exit('One of the arguments: model_weights_filename or native_model_weights_filepath must be provided.')
 
     # create the data object
     data = create_data_object_with_explicit_data_path(flplan=flplan, data_path=data_dir)
