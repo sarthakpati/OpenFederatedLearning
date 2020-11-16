@@ -59,7 +59,7 @@ def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, 
     if 'allowed' not in flplan['inference'] or flplan['inference']['allowed'] != True:        
         sys.exit("FL Plan must contain a {'inference: {'allowed': True}} entry in order for inference to be allowed.")
 
-    if fets-ai_model_weights_filename is not None and fets-ai_native_model_weights_filepath is not None:
+    if model_weights_filename is not None and native_model_weights_filepath is not None:
         sys.exit('Arguments: model_weights_filename (provided as {}) and native_model_weights_filepath (provided as {}) are mutually exclusive'.format(model_weights_filename, native_model_weights_filepath))
 
     # This script expects the model to populate its weights upon initialization.
