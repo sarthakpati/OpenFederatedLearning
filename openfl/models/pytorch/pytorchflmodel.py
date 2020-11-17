@@ -104,11 +104,11 @@ class PyTorchFLModel(nn.Module, FLModel):
     #             val_score += self.loss_fn(output, target).cpu().numpy() * samples
     #     return val_score / total_samples
     
-    def infer_volume(self, X):
-        """Run inference on a batch of 2d images
+    def infer_batch(self, X):
+        """Run inference on a batch
 
         Args:
-            X: Input
+            X: Input for batch
 
         Gets the outputs for the inputs provided.
 

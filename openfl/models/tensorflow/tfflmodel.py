@@ -155,11 +155,11 @@ class TensorFlowFLModel(FLModel):
 
         return self.sess.run([self.output, self.validation_metric], feed_dict=feed_dict)
 
-    def infer_volume(self, X):
-        """Runs inference on a batch of 2d images and returns the output of the model. Calls sess.run(self.output, {self.X: X})
+    def infer_batch(self, X):
+        """Runs inference on a batch and returns the output of the model. Calls sess.run(self.output, {self.X: X})
 
         Args:
-            X: Input
+            X: Input for batch
 
         Returns:
             np.array: sess.run results for self.output
