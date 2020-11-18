@@ -12,3 +12,4 @@
 # limitations under the License.
 
 from .flmodel import FLModel
+from .inference_only_model_wrapper import InferenceOnlyModelWrapper
