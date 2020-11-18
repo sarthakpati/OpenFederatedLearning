@@ -95,7 +95,6 @@ def main(plan, model_weights_filename, native_model_weights_filepath, populate_w
     # the model may have an 'infer_volume' method instead of 'infer_batch'
     if not hasattr(model, 'infer_batch'):
         if hasattr(model, 'infer_volume'):
-            print('Wrapping model')
             model = InferenceOnlyModelWrapper(data=data, base_model=model)
         else:
             sys.exit("Model object must have either an 'infer_batch' or 'infer_volume' method.") 
