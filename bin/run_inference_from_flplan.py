@@ -85,6 +85,7 @@ def main(plan, model_weights_filename, native_model_weights_filepath, populate_w
         if model_weights_filename is not None:
             model_file_argument_name = model_file_argument_name or 'model_weights_filename'
             flplan['model_object_init']['init_kwargs'].update({model_file_argument_name: model_weights_filename})
+        # model_weights_filename and native_model_weights_filepath are mutually exlusive and required (see argument parser)
         else:
             model_file_argument_name = model_file_argument_name or 'native_model_weights_filepath'
             flplan['model_object_init']['init_kwargs'].update({model_file_argument_name: native_model_weights_filepath})
@@ -100,9 +101,6 @@ def main(plan, model_weights_filename, native_model_weights_filepath, populate_w
             sys.exit("Model object must have either an 'infer_batch' or 'infer_volume' method.") 
 
     if not populate_weights_at_init: 
-        # record which tensors were held out from the saved proto
-        _, holdout_tensors = remove_and_save_holdout_tensors(model.get_tensor_dict())
-
         # if pbuf weights, we need to run deconstruct proto with a NoCompression pipeline
         if model_weights_filename is not None:        
             proto_path = os.path.join(base_dir, 'weights', model_weights_filename)
@@ -110,10 +108,12 @@ def main(plan, model_weights_filename, native_model_weights_filepath, populate_w
             tensor_dict_from_proto = deconstruct_proto(proto, NoCompressionPipeline())
 
             # restore any tensors held out from the proto
+            _, holdout_tensors = remove_and_save_holdout_tensors(model.get_tensor_dict())        
             tensor_dict = {**tensor_dict_from_proto, **holdout_tensors}
 
             model.set_tensor_dict(tensor_dict, with_opt_vars=False)
 
+        # model_weights_filename and native_model_weights_filepath are mutually exlusive and required (see argument parser)
         else:
             # FIXME: how do we handle kwargs here? Will they come from the flplan?
             model.load_native(native_model_weights_filepath)
