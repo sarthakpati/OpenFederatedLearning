@@ -2,7 +2,7 @@
 # Licensed subject to the terms of the separately executed evaluation license agreement between Intel Corporation and you.
 
 
-from openfl.models import FLModel
+from openfl.models.flmodel import FLModel
 from openfl.flplan import init_object
 
 class InferenceOnlyModelWrapper(FLModel):
@@ -70,9 +70,19 @@ class InferenceOnlyModelWrapper(FLModel):
             base_model: Base model satisfying requirements above
         """
 
-        super(InferenceOnlyFLModelWrapper, self).__init__(data=data)
+        super(InferenceOnlyModelWrapper, self).__init__(data=data)
 
         self.infer_batch = base_model.infer_volume
+
+        # If base_model has implemented FLModel methods below, we expose them
+        # to be used to populate model weights outside of the model init if desired.
+        # FIXME: Dependency on knowlege of FLModel object here
+        #        Should we instead dynamically transfer methods?
+
+        for method_name in ['get_tensor_dict', 'set_tensor_dict', 'load_native']:
+            if hasattr(base_model, method_name):
+                setattr(self, method_name, getattr(base_model, method_name))
+        
 
 
 
