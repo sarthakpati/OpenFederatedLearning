@@ -97,8 +97,8 @@ def main(plan, model_weights_filename, native_model_weights_filepath, populate_w
     if not hasattr(model, 'infer_batch'):
         if hasattr(model, 'infer_volume'):
             model = InferenceOnlyModelWrapper(data=data, base_model=model)
-        else:
-            sys.exit("Model object must have either an 'infer_batch' or 'infer_volume' method.") 
+        elif not hasattr(model, 'run_inference_and_store_results'):
+            sys.exit("If model object does not have a 'run_inference_and_store_results' method, it must have either an 'infer_batch' or 'infer_volume' method.") 
 
     if not populate_weights_at_init: 
         # if pbuf weights, we need to run deconstruct proto with a NoCompression pipeline
