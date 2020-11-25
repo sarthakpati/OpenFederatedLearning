@@ -41,7 +41,7 @@ def remove_and_save_holdout_tensors(tensor_dict):
         return shared_tensors, holdout_tensors
 
 
-def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, logging_config_path, logging_default_level, logging_directory, model_device):
+def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, logging_config_path, logging_default_level, logging_directory, model_device, inference_patient):
     """Runs the inference according to the flplan, data-dir and weights file. Output format is determined by the data object in the flplan
 
     Args:
@@ -51,6 +51,7 @@ def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, 
         data_dir (string)               : The directory path for the parent directory containing the data. Path will be relative to the working directory.
         logging_config_fname (string)   : The log file
         logging_default_level (string)  : The log level
+        inference_patient (string)      : Subdirectory of single patient to run inference on (exclusively)
 
     """
 
@@ -75,7 +76,7 @@ def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, 
         sys.exit("FL Plan must contain a {'inference: {'allowed': True}} entry in order for inference to be allowed.")
 
     # create the data object
-    data = create_data_object_with_explicit_data_path(flplan=flplan, data_path=data_dir)
+    data = create_data_object_with_explicit_data_path(flplan=flplan, data_path=data_dir, inference_patient=inference_patient)
 
     # create the model object
     model = create_model_object(flplan, data, model_device=model_device)
@@ -117,5 +118,6 @@ if __name__ == '__main__':
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
     # FIXME: this kind of commandline configuration needs to be done in a consistent way
     parser.add_argument('--model_device', '-md', type=str, default='cpu')
+    parser.add_argument('--inference_patient', '-ip', type=str, default=None)
     args = parser.parse_args()
     main(**vars(args))
