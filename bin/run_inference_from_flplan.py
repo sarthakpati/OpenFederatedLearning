@@ -20,6 +20,7 @@ import logging
 import importlib
 
 from openfl import split_tensor_dict_for_holdouts
+from openfl.models import InferenceOnlyModelWrapper
 from openfl.tensor_transformation_pipelines import NoCompressionPipeline
 from openfl.proto.protoutils import deconstruct_proto, load_proto
 from openfl.flplan import create_data_object_with_explicit_data_path, parse_fl_plan, create_model_object
@@ -41,22 +42,21 @@ def remove_and_save_holdout_tensors(tensor_dict):
         return shared_tensors, holdout_tensors
 
 
-def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, logging_config_path, logging_default_level, logging_directory, model_device, inference_patient=None):
+def main(plan, model_weights_filename, native_model_weights_filepath, populate_weights_at_init, model_file_argument_name, data_dir, logging_config_path, logging_default_level, logging_directory, model_device, inference_patient=None):
     """Runs the inference according to the flplan, data-dir and weights file. Output format is determined by the data object in the flplan
 
     Args:
-        plan (string)                   : The filename for the federation (FL) plan YAML file
-        model_weights_filename (string) : A .pbuf filename in the common weights directory (mutually exclusive with native_model_weights_filepath). NOTE: these must be uncompressed weights!!
-        native_model_weights_filepath   : A framework-specific filepath. Path will be relative to the working directory. (mutually exclusive with model_weights_filename)
-        data_dir (string)               : The directory path for the parent directory containing the data. Path will be relative to the working directory.
-        logging_config_fname (string)   : The log file
-        logging_default_level (string)  : The log level
-        inference_patient (string)      : Subdirectory of single patient to run inference on (exclusively)
+        plan (string)                           : The filename for the federation (FL) plan YAML file
+        model_weights_filename (string)         : A .pbuf filename in the common weights directory (mutually exclusive with native_model_weights_filepath). NOTE: these must be uncompressed weights!!
+        native_model_weights_filepath (string)  : A framework-specific filepath. Path will be relative to the working directory. (mutually exclusive with model_weights_filename)
+        populate_weights_at_init (boolean)      : Whether or not the model populates its own weights at instantiation
+        model_file_argument_name (string)       : Name of argument to be passed to model __init__ providing model file location info
+        data_dir (string)                       : The directory path for the parent directory containing the data. Path will be relative to the working directory.
+        logging_config_fname (string)           : The log file
+        logging_default_level (string)          : The log level
+        inference_patient (string)              : Subdirectory of single patient to run inference on (exclusively)
 
     """
-
-    if model_weights_filename is not None and native_model_weights_filepath is not None:
-        sys.exit("Parameters model_weights_filename and native_model_weights_filepath are mutually exclusive.\nmodel_weights_file was set to {}\native_model_weights_filepath was set to {}".format(model_weights_filename, native_model_weights_filepath))
 
     # FIXME: consistent filesystem (#15)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -78,28 +78,47 @@ def main(plan, model_weights_filename, native_model_weights_filepath, data_dir, 
     # create the data object
     data = create_data_object_with_explicit_data_path(flplan=flplan, data_path=data_dir, inference_patient=inference_patient)
 
-    # create the model object
+    # TODO: Find a good way to detect and communicate mishandling of model_file_argument_name
+    #       Ie, capture exception of model not gettinng its required kwarg for this purpose, also
+    #       how to tell if the model is using its random initialization rather than weights from file?
+    if populate_weights_at_init:
+        # Supplementing the flplan base model kwargs to include model weights file info.
+        if model_weights_filename is not None:
+            model_file_argument_name = model_file_argument_name or 'model_weights_filename'
+            flplan['model_object_init']['init_kwargs'].update({model_file_argument_name: model_weights_filename})
+        # model_weights_filename and native_model_weights_filepath are mutually exlusive and required (see argument parser)
+        else:
+            model_file_argument_name = model_file_argument_name or 'native_model_weights_filepath'
+            flplan['model_object_init']['init_kwargs'].update({model_file_argument_name: native_model_weights_filepath})
+
+    # create the base model object
     model = create_model_object(flplan, data, model_device=model_device)
 
-    # record which tensors were held out from the saved proto
-    _, holdout_tensors = remove_and_save_holdout_tensors(model.get_tensor_dict())
+    # the model may have an 'infer_volume' method instead of 'infer_batch'
+    if not hasattr(model, 'infer_batch'):
+        if hasattr(model, 'infer_volume'):
+            model = InferenceOnlyModelWrapper(data=data, base_model=model)
+        elif not hasattr(model, 'run_inference_and_store_results'):
+            sys.exit("If model object does not have a 'run_inference_and_store_results' method, it must have either an 'infer_batch' or 'infer_volume' method.") 
 
-    # if pbuf weights, we need to run deconstruct proto with a NoCompression pipeline
-    if model_weights_filename is not None:        
-        proto_path = os.path.join(base_dir, 'weights', model_weights_filename)
-        proto = load_proto(proto_path)
-        tensor_dict_from_proto = deconstruct_proto(proto, NoCompressionPipeline())
+    if not populate_weights_at_init: 
+        # if pbuf weights, we need to run deconstruct proto with a NoCompression pipeline
+        if model_weights_filename is not None:        
+            proto_path = os.path.join(base_dir, 'weights', model_weights_filename)
+            proto = load_proto(proto_path)
+            tensor_dict_from_proto = deconstruct_proto(proto, NoCompressionPipeline())
 
-        # restore any tensors held out from the proto
-        tensor_dict = {**tensor_dict_from_proto, **holdout_tensors}
+            # restore any tensors held out from the proto
+            _, holdout_tensors = remove_and_save_holdout_tensors(model.get_tensor_dict())        
+            tensor_dict = {**tensor_dict_from_proto, **holdout_tensors}
 
-        model.set_tensor_dict(tensor_dict, with_opt_vars=False)
-    elif native_model_weights_filepath is not None:
-        # FIXME: how do we handle kwargs here? Will they come from the flplan?
-        model.load_native(native_model_weights_filepath)
-    else:
-        sys.exit("One of model_weights_filename or native_model_weights_filepath is required.")
+            model.set_tensor_dict(tensor_dict, with_opt_vars=False)
 
+        # model_weights_filename and native_model_weights_filepath are mutually exlusive and required (see argument parser)
+        else:
+            # FIXME: how do we handle kwargs here? Will they come from the flplan?
+            model.load_native(native_model_weights_filepath)
+       
     # finally, call the model object's run_inference_and_store_results with the kwargs from the inference block
     inference_kwargs = flplan['inference'].get('kwargs') or {}
     model.run_inference_and_store_results(**inference_kwargs)
@@ -111,7 +130,9 @@ if __name__ == '__main__':
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--model_weights_filename', '-mwf', type=str, default=None)
     group.add_argument('--native_model_weights_filepath', '-nmwf', type=str, default=None)
+    parser.add_argument('--populate_weights_at_init', '-pwai', dest='populate_weights_at_init', default=False, action='store_true')
     # FIXME: data_dir should be data_path
+    parser.add_argument('--model_file_argument_name', '-mfa', type=str, default=None)
     parser.add_argument('--data_dir', '-d', type=str, default=None, required=True)
     parser.add_argument('--logging_config_path', '-lc', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
