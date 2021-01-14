@@ -14,7 +14,7 @@
 from setuptools import setup
 
 setup(name='openfl',
-      version='0.0.1',
+      version='0.0.2',
       packages=['openfl',
                 'openfl.aggregator',
                 'openfl.collaborator',

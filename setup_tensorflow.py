@@ -14,7 +14,7 @@
 from setuptools import setup
 
 setup(name='openfl.tensorflow',
-      version='0.0.1',
+      version='0.0.2',
       packages=['openfl.models.tensorflow', 
                 'openfl.models.tensorflow.keras_cnn', 
                 'openfl.models.tensorflow.keras_resnet', 

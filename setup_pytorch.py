@@ -14,7 +14,7 @@
 from setuptools import setup
 
 setup(name='openfl.pytorch',
-      version='0.0.1',
+      version='0.0.2',
       packages=['openfl.models.pytorch', 
                 'openfl.models.pytorch.pt_2dunet', 
                 'openfl.models.pytorch.pt_cnn',
