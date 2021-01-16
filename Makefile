@@ -46,10 +46,10 @@ openfl_tensorflow 	= venv/lib/$(python_version)/site-packages/openfl/models/tens
 fets		 		= venv/lib/$(python_version)/site-packages/fets
 
 # the wheel files for the packages
-openfl_whl 				= dist/openfl-0.0.2-py3-none-any.whl
-openfl_pytorch_whl 		= dist/openfl.pytorch-0.0.2-py3-none-any.whl
-openfl_tensorflow_whl 	= dist/openfl.tensorflow-0.0.2-py3-none-any.whl
-fets_whl				= submodules/fets_ai/Algorithms/dist/fets-0.0.2-py3-none-any.whl
+openfl_whl 				= dist/openfl-0.0.1-py3-none-any.whl
+openfl_pytorch_whl 		= dist/openfl.pytorch-0.0.1-py3-none-any.whl
+openfl_tensorflow_whl 	= dist/openfl.tensorflow-0.0.1-py3-none-any.whl
+fets_whl				= submodules/fets_ai/Algorithms/dist/fets-0.0.1-py3-none-any.whl
 
 # the python virtual env recipe
 $(venv):
