@@ -337,8 +337,7 @@ class Collaborator(object):
 
         self.logger.debug("{} Completed the training job for {} batches.".format(self, num_batches))
 
-        # allowing for the return of information regarding number of samples that were used (so excluding ones that 
-        # produced nan gradients)
+        # allowing extra information regarding training to be logged (for now none of the extra info is sent to the aggregator)
         if isinstance(train_info, dict):
             loss = train_info["loss"]
             self.logger.debug("{} model is returning dictionary of training info: {}".format(self, train_info))
