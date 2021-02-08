@@ -78,12 +78,10 @@ class Aggregator(object):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
         self.federation_uuid = federation_uuid
-        #FIXME: Should we do anything to insure the intial model is compressed?
-        self.model = load_proto(init_model_fpath)
+
         self.latest_model_fpath = latest_model_fpath
         self.best_model_fpath = best_model_fpath
         self.collaborator_common_names = collaborator_common_names
-        self.round_num = 1
         self.rounds_to_train = rounds_to_train
         self.quit_job_sent_to = []
         self.minimum_reporting = minimum_reporting
@@ -95,6 +93,13 @@ class Aggregator(object):
             self.log_big_warning()
         else:
             self.single_col_cert_common_name = '' # FIXME: '' instead of None is just for protobuf compatibility. Cleaner solution?
+
+        # FIXME: Should we do anything to insure the intial model is compressed?
+        self.model = load_proto(init_model_fpath)
+        self.logger.info("Loaded initial model from {}".format(init_model_fpath))
+        self.logger.info("Initial model version is {}".format(self.model.header.version))
+
+        self.round_num = self.model.header.version + 1
 
         self.model_update_in_progress = None
 

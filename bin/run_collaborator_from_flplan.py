@@ -24,7 +24,15 @@ from openfl.flplan import create_collaborator_object_from_flplan, parse_fl_plan,
 from setup_logging import setup_logging
 
 
-def main(plan, collaborator_common_name, single_col_cert_common_name, data_config_fname, data_dir, logging_config_path, logging_default_level, logging_directory, model_device):
+def main(plan, 
+         collaborator_common_name, 
+         single_col_cert_common_name, 
+         data_config_fname, 
+         data_dir, 
+         logging_config_path, 
+         logging_default_level, 
+         logging_directory, 
+         model_device):
     """Runs the collaborator client process from the federation (FL) plan
 
     Args:
@@ -34,7 +42,7 @@ def main(plan, collaborator_common_name, single_col_cert_common_name, data_confi
         data_config_fname: The dataset configuration filename (YAML)
         logging_config_fname: The log file
         logging_default_level: The log level
-        model_device: gets passed to model 'init' function as "device".  
+        model_device: gets passed to model 'init' function as "device".
     """
     # FIXME: consistent filesystem (#15)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -46,22 +54,27 @@ def main(plan, collaborator_common_name, single_col_cert_common_name, data_confi
     logging_directory = os.path.join(script_dir, logging_directory)
 
     setup_logging(path=logging_config_path, default_level=logging_default_level, logging_directory=logging_directory)
-
+    
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
 
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
 
-    collaborator = create_collaborator_object_from_flplan(flplan,
-                                                          collaborator_common_name,
-                                                          local_config,
-                                                          base_dir,
-                                                          weights_dir,
-                                                          metadata_dir,
-                                                          single_col_cert_common_name,
-                                                          data_dir=data_dir,
-                                                          model_device=model_device)
+    try:
+        collaborator = create_collaborator_object_from_flplan(flplan,
+                                                            collaborator_common_name,
+                                                            local_config,
+                                                            base_dir,
+                                                            weights_dir,
+                                                            metadata_dir,
+                                                            single_col_cert_common_name,
+                                                            data_dir=data_dir,
+                                                            model_device=model_device)
 
-    collaborator.run()
+        collaborator.run()
+        sys.exit(0)
+    except Exception as e:
+        logging.getLogger(__name__).exception(repr(e))
+        sys.exit(1)
 
 
 if __name__ == '__main__':

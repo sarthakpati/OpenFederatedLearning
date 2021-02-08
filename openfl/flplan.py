@@ -140,7 +140,12 @@ def get_serve_kwargs_from_flpan(flplan, base_dir):
     return serve_kwargs
 
 
-def create_aggregator_object_from_flplan(flplan, collaborator_common_names, single_col_cert_common_name, weights_dir, metadata_dir):
+def create_aggregator_object_from_flplan(flplan,
+                                         collaborator_common_names,
+                                         single_col_cert_common_name,
+                                         weights_dir,
+                                         metadata_dir,
+                                         resume):
     init_kwargs = flplan['aggregator_object_init']['init_kwargs']
 
     # FIXME: this sort of hackery should be handled by a filesystem abstraction
@@ -161,6 +166,14 @@ def create_aggregator_object_from_flplan(flplan, collaborator_common_names, sing
             init_kwargs[k] = os.path.join(metadata_dir, init_kwargs[k])
 
     compression_pipeline = create_compression_pipeline(flplan)
+
+    # FIXME: another hack that should not be inherited by production openfl
+    # if set to "resume", we over-write the "init" values with the "latest" values
+    if resume:
+        if 'init_model_fpath' in init_kwargs and 'latest_model_fpath' in init_kwargs:
+            init_kwargs['init_model_fpath'] = init_kwargs['latest_model_fpath']
+        if 'init_metadata_fname' in init_kwargs and 'latest_metadata_fname' in init_kwargs:
+            init_kwargs['init_metadata_fname'] = init_kwargs['latest_metadata_fname']
 
     return Aggregator(compression_pipeline=compression_pipeline,
                       **init_kwargs)
