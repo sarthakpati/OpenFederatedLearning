@@ -395,7 +395,15 @@ class Collaborator(object):
         download_start = time.time()
 
         # sanity check on version is implicit in send
-        reply = self.channel.DownloadModel(ModelDownloadRequest(header=self.create_message_header(), model_header=self.model_header))
+        # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
+        # an exception can happen in cases where we simply need to retry
+        try:
+            reply = self.channel.DownloadModel(ModelDownloadRequest(header=self.create_message_header(), model_header=self.model_header))
+        except Exception as e:
+            self.logger.exception(repr(e))
+            self.logger.warning("Retrying download of model")
+            reply = self.channel.DownloadModel(ModelDownloadRequest(header=self.create_message_header(), model_header=self.model_header))
+
         received_model_proto = reply.model
         received_model_version = received_model_proto.header.version
 
