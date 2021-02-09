@@ -358,7 +358,15 @@ class Collaborator(object):
 
         self.logger.debug("{} - Sending the model to the aggregator.".format(self))
 
-        reply = self.channel.UploadLocalModelUpdate(LocalModelUpdate(header=self.create_message_header(), model=model_proto, data_size=data_size, loss=loss))
+        # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
+        # an exception can happen in cases where we simply need to retry
+        try:
+            reply = self.channel.UploadLocalModelUpdate(LocalModelUpdate(header=self.create_message_header(), model=model_proto, data_size=data_size, loss=loss))
+        except Exception as e:
+            self.logger.exception(repr(e))
+            self.logger.warning("Retrying upload of model")
+            reply = self.channel.UploadLocalModelUpdate(LocalModelUpdate(header=self.create_message_header(), model=model_proto, data_size=data_size, loss=loss))
+
         self.validate_header(reply)
         check_type(reply, LocalModelUpdateAck, self.logger)
         self.logger.info("{} - Model update succesfully sent to aggregator".format(self))
