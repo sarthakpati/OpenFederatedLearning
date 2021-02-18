@@ -21,7 +21,9 @@ package openfl_proto;
 service Aggregator {
     rpc RequestJob(JobRequest) returns (JobReply) {}
     rpc DownloadModel(ModelDownloadRequest) returns (stream DataStream) {}
-    rpc UploadLocalModelUpdate(stream DataStream) returns (LocalModelUpdateAck) {}
+    // rpc UploadLocalModelUpdate(stream DataStream) returns (LocalModelUpdateAck) {}
+    rpc UploadLocalLossResults(LocalLossResults) returns (LocalLossResultsAck) {}
+    rpc UploadLocalLayerUpdate(stream DataStream) returns (LocalLayerUpdateAck) {}
     rpc UploadLocalMetricsUpdate(LocalValidationResults) returns (LocalValidationResultsAck) {}
 }
 
@@ -37,6 +39,7 @@ enum Job {
     JOB_YIELD = 2;
     JOB_QUIT = 3;
     JOB_DOWNLOAD_MODEL = 4;
+    JOB_UPLOAD_LAYER = 5;
 }
 
 message MetadataProto {
@@ -72,20 +75,37 @@ message ModelHeader {
 message ModelProto {
     ModelHeader header = 1;
     repeated TensorProto tensors = 2;
-    
+}
+
+message LayerProto {
+    ModelHeader header = 1;
+    TensorProto tensor = 2;
 }
 
 
 // COLLABORATOR MESSAGES
 
-message LocalModelUpdate {
+// message LocalModelUpdate {
+//     MessageHeader header = 1;
+//     ModelProto model = 2;
+//     int32 data_size = 3;
+//     // map<string, float> loss = 4;
+//     float loss = 4;
+// }
+
+
+message LocalLossResults {
     MessageHeader header = 1;
-    ModelProto model = 2;
-    int32 data_size = 3;
-    // map<string, float> loss = 4;
-    float loss = 4;
+    ModelHeader model_header = 2;
+    float loss = 3;
+    int32 data_size = 4;
 }
 
+
+message LocalLayerUpdate {
+    MessageHeader header = 1;
+    LayerProto model = 2;
+}
 
 message LocalValidationResults {
     MessageHeader header = 1;
@@ -120,16 +140,20 @@ message GlobalModelUpdate {
     string metadata_yaml = 4;
 }
 
-
 message JobReply {
     MessageHeader header = 1;
     Job job = 2;
+    string extra = 3;
 }
 
-message LocalModelUpdateAck {
+message LocalLayerUpdateAck {
     MessageHeader header = 1;
 }
 
 message LocalValidationResultsAck {
+    MessageHeader header = 1;
+}
+
+message LocalLossResultsAck {
     MessageHeader header = 1;
 }

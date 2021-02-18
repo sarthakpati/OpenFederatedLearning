@@ -470,6 +470,9 @@ class Aggregator(object):
 
         return reply
 
+    def collaborator_has_trained(self, collaborator):
+        return collaborator in self.per_col_round_stats["collaborator_training_sizes"]
+
     def RequestJob(self, message):
         """Parse message for job request and act accordingly.
 
@@ -484,29 +487,40 @@ class Aggregator(object):
         t = time.time()
         self.validate_header(message)
 
+        # extra info for job reply
+        extra = ""
+
+        # get the collaborator who sent this message
+        collaborator = message.header.sender
+
         # FIXME: we should really have each collaborator validate one last time
         # check if we are done
         if self.round_num > self.rounds_to_train:
             job = JOB_QUIT
-            self.quit_job_sent_to.append(message.header.sender)
+            self.quit_job_sent_to.append(collaborator)
         # FIXME: this flow needs to depend on a job selection output for the round
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
         elif self.collaborator_out_of_date(message.model_header):
             job = JOB_DOWNLOAD_MODEL
+            self.reset_collaborator_results_for_current_round(collaborator)
         # else, check if this collaborator has not sent validation results
-        elif message.header.sender not in self.per_col_round_stats["agg_validation_results"]:
+        elif collaborator not in self.per_col_round_stats["agg_validation_results"]:
             job = JOB_VALIDATE
         # else, check if this collaborator has not sent training results
-        elif message.header.sender not in self.per_col_round_stats["collaborator_training_sizes"]:
+        elif not self.collaborator_has_trained(collaborator):
             job = JOB_TRAIN
-        elif message.header.sender not in self.per_col_round_stats["preagg_validation_results"]:
+        # else, see if we still need layer updates
+        elif self.collaborator_next_layer_needed(collaborator) is not None:
+            job = JOB_UPLOAD_LAYER
+            extra = self.collaborator_next_layer_needed(collaborator)
+        elif collaborator not in self.per_col_round_stats["preagg_validation_results"]:
             job = JOB_VALIDATE
         # else this collaborator is done for the round
         else:
             job = JOB_YIELD
 
-        self.logger.debug("Receive job request from %s and assign with %s" % (message.header.sender, job))
+        self.logger.debug("Receive job request from %s and assign with %s (extra: %s)" % (collaborator, job, extra))
 
         reply = JobReply(header=self.create_reply_header(message), job=job)
 
