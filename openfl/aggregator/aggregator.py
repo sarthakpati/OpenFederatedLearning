@@ -248,18 +248,26 @@ class Aggregator(object):
             self.end_of_round()
 
     def get_weighted_average_of_collaborators(self, value_dict, weight_dict):
-        """Calculate the weighted average of the model updates from the collaborators.
+        """Calculate the weighted average of data from the collaborators.
 
         Args:
-            value_dict: A dictionary of the values (model tensors)
+            value_dict: A dictionary of the values (values can be dictionaries)
             weight_dict: A dictionary of the collaborator weights (percentage of total data size)
 
         Returns:
-            Dictionary of the weights average for all collaborator models
+            Dictionary containing weighted averages across collaborators
 
         """
         cols = [k for k in value_dict.keys() if k in self.collaborator_common_names]
-        return np.average([value_dict[c] for c in cols], weights=[weight_dict[c] for c in cols])
+        # detect if our value dictionary has one or two levels,and if so get the second level keys
+        example_value = value_dict[cols[0]]
+        if isinstance(example_value, dict):
+            averages = {}
+            for key in example_value.keys():
+                averages[key] = np.average([value_dict[c][key] for c in cols], weights=[weight_dict[c] for c in cols])
+        else:        
+            averages = np.average([value_dict[c] for c in cols], weights=[weight_dict[c] for c in cols])
+        return averages
 
     def end_of_round(self):
         """Runs required tasks when the training round has ended.
