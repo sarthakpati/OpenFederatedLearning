@@ -261,12 +261,13 @@ class Aggregator(object):
         cols = [k for k in value_dict.keys() if k in self.collaborator_common_names]
         # detect if our value dictionary has one or two levels,and if so get the second level keys
         example_value = value_dict[cols[0]]
-        if isinstance(example_value, dict):
+        if isinstance(example_value, float):
+            averages = float(np.average([value_dict[c] for c in cols], weights=[weight_dict[c] for c in cols]))
+        else:
             averages = {}
             for key in example_value.keys():
-                averages[key] = np.average([value_dict[c][key] for c in cols], weights=[weight_dict[c] for c in cols])
-        else:        
-            averages = np.average([value_dict[c] for c in cols], weights=[weight_dict[c] for c in cols])
+                averages[key] = float(np.average([value_dict[c][key] for c in cols], weights=[weight_dict[c] for c in cols])) 
+            
         return averages
 
     def end_of_round(self):
@@ -283,7 +284,7 @@ class Aggregator(object):
                                                                 self.per_col_round_stats["collaborator_validation_sizes"])
 
         # FIXME: is it correct to put this in the metadata?
-        self.metadata_for_round.update({'loss': float(round_loss), 'round_{}_validation'.format(self.round_num-1): float(round_val)})
+        self.metadata_for_round.update({'loss': round_loss, 'round_{}_validation'.format(self.round_num-1): round_val})
 
         # FIXME: proper logging
         self.logger.info('round results for model id/version {}/{}'.format(self.model.header.id, self.model.header.version))
@@ -315,7 +316,11 @@ class Aggregator(object):
         # Save the new model as latest model.
         dump_proto(self.model, self.latest_model_fpath)
 
-        model_score = round_val
+        # in case that round_val is a dictionary (asuming one level only), basing best model on average of inner value
+        if isinstance(round_val, dict):
+            model_score = np.average(list(round_val.values()))
+        else:
+            model_score = round_val
         if self.best_model_score is None or self.best_model_score < model_score:
             self.logger.info("Saved the best model with score {:f}.".format(model_score))
             self.best_model_score = model_score
