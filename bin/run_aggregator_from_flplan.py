@@ -21,7 +21,13 @@ from openfl.flplan import parse_fl_plan, load_yaml, create_aggregator_object_fro
 from setup_logging import setup_logging
 
 
-def main(plan, collaborators_file, single_col_cert_common_name, logging_config_path, logging_default_level, logging_directory):
+def main(plan, 
+         collaborators_file, 
+         single_col_cert_common_name, 
+         logging_config_path, 
+         logging_default_level, 
+         logging_directory,
+         resume):
     """Runs the aggregator service from the Federation (FL) plan
 
     Args:
@@ -30,6 +36,7 @@ def main(plan, collaborators_file, single_col_cert_common_name, logging_config_p
         single_col_cert_common_name: The SSL certificate
         logging_config_path: The log configuration file
         logging_default_level: The log level
+        resume: Whether the aggregator should load the latest model instead of the initial model
 
     """
     # FIXME: consistent filesystem (#15)
@@ -47,7 +54,12 @@ def main(plan, collaborators_file, single_col_cert_common_name, logging_config_p
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
     collaborator_common_names = load_yaml(os.path.join(collaborators_dir, collaborators_file))['collaborator_common_names']
 
-    agg             = create_aggregator_object_from_flplan(flplan, collaborator_common_names, single_col_cert_common_name, weights_dir, metadata_dir)
+    agg             = create_aggregator_object_from_flplan(flplan,
+                                                           collaborator_common_names,
+                                                           single_col_cert_common_name,
+                                                           weights_dir,
+                                                           metadata_dir,
+                                                           resume)
     server          = create_aggregator_server_from_flplan(agg, flplan)
     serve_kwargs    = get_serve_kwargs_from_flpan(flplan, base_dir)
     
@@ -61,5 +73,6 @@ if __name__ == '__main__':
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
+    parser.add_argument('--resume', '-r', type=bool, default=False)
     args = parser.parse_args()
     main(**vars(args))
