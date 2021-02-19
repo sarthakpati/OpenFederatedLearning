@@ -17,7 +17,8 @@ import os
 from openfl.flplan import create_data_object, create_model_object, create_compression_pipeline, create_aggregator_object_from_flplan, create_collaborator_object_from_flplan
 
 
-def federate(flplan,
+def federate(flplan, 
+             resume,
              local_config,
              collaborator_common_names,
              base_dir,
@@ -43,7 +44,8 @@ def federate(flplan,
                                                       collaborator_common_names,
                                                       None,
                                                       weights_dir,
-                                                      metadata_dir)
+                                                      metadata_dir, 
+                                                      resume=resume)
 
     # create the collaborators
     collaborators = {} 
