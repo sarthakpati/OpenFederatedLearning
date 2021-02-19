@@ -388,6 +388,10 @@ class Collaborator(object):
         self.logger.debug("{} - Completed the validation job.".format(self))
         data_size = self.wrapped_model.get_validation_data_size()
 
+        # FIXME: this is a hack to help with older models that don't return dictionaries
+        if not isinstance(results, dict):
+            results = {'validation': results}
+
         reply = self.channel.UploadLocalMetricsUpdate(LocalValidationResults(header=self.create_message_header(), model_header=self.model_header, results=results, data_size=data_size))
         self.validate_header(reply)
         check_type(reply, LocalValidationResultsAck, self.logger)
