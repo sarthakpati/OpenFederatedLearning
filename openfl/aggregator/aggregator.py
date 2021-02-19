@@ -127,6 +127,9 @@ class Aggregator(object):
         self.metadata['federation_uuid'] = federation_uuid
         self.metadata_for_round = {}
 
+    def stop_at_end_of_round(self):
+        self.rounds_to_train = self.round_num
+
     def ensure_save_all_path_exists(self):
         if self.save_all_models_path is None:
             return
