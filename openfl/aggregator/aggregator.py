@@ -501,7 +501,11 @@ class Aggregator(object):
         # check if we are done
         if self.round_num > self.rounds_to_train:
             job = JOB_QUIT
-            self.quit_job_sent_to.append(message.header.sender)
+
+            # we may need to send this again if the collaborator process has been restarted for some reason
+            # thus we may not need to add it to the list again
+            if message.header.sender not in self.quit_job_sent_to:
+                self.quit_job_sent_to.append(message.header.sender)
         # FIXME: this flow needs to depend on a job selection output for the round
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
