@@ -40,13 +40,18 @@ def main(plan,
     """Runs the collaborator client process from the federation (FL) plan
 
     Args:
-        plan: The filename for the federation (FL) plan YAML file
-        collaborator_common_name: The common name for the collaborator node
-        single_col_cert_common_name: The SSL certificate for this collaborator
-        data_config_fname: The dataset configuration filename (YAML)
-        logging_config_fname: The log file
-        logging_default_level: The log level
-        model_device: gets passed to model 'init' function as "device".
+        plan                        : The filename for the federation (FL) plan YAML file
+        collaborator_common_name    : The common name for the collaborator node
+        single_col_cert_common_name : The SSL certificate for this collaborator
+        data_config_fname           : The dataset configuration filename (YAML)
+        data_dir                    : parent directory holding the patient data subdirectories(to be split into train and val)
+        validate_on_patches         : model init kwarg
+        data_in_memory              : data init kwarg 
+        data_queue_max_length       : data init kwarg 
+        data_queue_num_workers      : data init kwarg
+        logging_config_fname        : The log file
+        logging_default_level       : The log level
+        model_device                : gets passed to model 'init' function as "device"
     """
     # FIXME: consistent filesystem (#15)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -61,18 +66,16 @@ def main(plan,
     
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
 
-    # FIXME: Find a better solution for passing model and data kwargs through the plan
+    # FIXME: Find a better solution for passing model and data init kwargs
     model_init_kwarg_keys = ['validate_on_patches']
     model_init_kwarg_vals = [validate_on_patches]
-    for key, value in zip(model_init_kwarg_keys, model_init_kwarg_values):
+    for key, value in zip(model_init_kwarg_keys, model_init_kwarg_vals):
         flplan['model_object_init']['init_kwargs'][key] = value
-        WORKING HERE< GET THE STRING OF VARIABLE
 
-
-    data_init_kwarg_keys = ['data_in_memory', 'data_patch_size', 'data_queue_max_length', 'data_queue_samples_per_volume', 'data_queue_num_workers']
-    data_init_kwarg_vals = [data_in_memory,data_patch_size, data_queue_max_length, 
-         data_queue_samples_per_volume, 
-         data_queue_num_workers]
+    data_init_kwarg_keys = ['data_in_memory', 'data_queue_max_length', 'data_queue_num_workers']
+    data_init_kwarg_vals = [data_in_memory,data_queue_max_length, data_queue_num_workers]
+    for key, value in zip(data_init_kwarg_keys, data_init_kwarg_vals):
+        flplan['data_object_init']['init_kwargs'][key] = value
 
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
 

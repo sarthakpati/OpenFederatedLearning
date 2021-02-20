@@ -23,7 +23,19 @@ from single_proc_fed    import federate
 from setup_logging      import setup_logging
 
 
-def main(plan, resume, collaborators_file, data_config_fname, logging_config_path, logging_default_level, logging_directory, model_device, **kwargs):
+def main(plan, 
+         resume, 
+         collaborators_file, 
+         data_config_fname, 
+         validate_on_patches,
+         data_in_memory, 
+         data_queue_max_length, 
+         data_queue_num_workers,
+         logging_config_path, 
+         logging_default_level, 
+         logging_directory, 
+         model_device, 
+         **kwargs):
     """Run the federation simulation from the federation (FL) plan.
 
     Runs a federated training from the federation (FL) plan but creates the
@@ -32,12 +44,17 @@ def main(plan, resume, collaborators_file, data_config_fname, logging_config_pat
     on the remote collaborator nodes.
 
     Args:
-        plan: The Federation (FL) plan (YAML file)
-        collaborators_file: The file listing the collaborators
-        data_config_fname: The file describing where the dataset is located on the collaborators
-        logging_config_path: The log file
-        logging_default_level: The log level
-        **kwargs: Variable parameters to pass to the function
+        plan                    : The Federation (FL) plan (YAML file)
+        resume                  : Whether or not the aggregator is told to resume from previous best
+        collaborators_file      : The file listing the collaborators
+        data_config_fname       : The file describing where the dataset is located on the collaborators
+        validate_on_patches     : model init kwarg
+        data_in_memory          : data init kwarg 
+        data_queue_max_length   : data init kwarg 
+        data_queue_num_workers  : data init kwarg
+        logging_config_path     : The log file
+        logging_default_level   : The log level
+        **kwargs                : Variable parameters to pass to the function
 
     """
     # FIXME: consistent filesystem (#15)
@@ -56,6 +73,18 @@ def main(plan, resume, collaborators_file, data_config_fname, logging_config_pat
 
     # load the flplan, local_config and collaborators file
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
+
+    # FIXME: Find a better solution for passing model and data init kwargs
+    model_init_kwarg_keys = ['validate_on_patches']
+    model_init_kwarg_vals = [validate_on_patches]
+    for key, value in zip(model_init_kwarg_keys, model_init_kwarg_vals):
+        flplan['model_object_init']['init_kwargs'][key] = value
+
+    data_init_kwarg_keys = ['data_in_memory', 'data_queue_max_length', 'data_queue_num_workers']
+    data_init_kwarg_vals = [data_in_memory,data_queue_max_length, data_queue_num_workers]
+    for key, value in zip(data_init_kwarg_keys, data_init_kwarg_vals):
+        flplan['data_object_init']['init_kwargs'][key] = value
+
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
     collaborator_common_names = load_yaml(os.path.join(collaborators_dir, collaborators_file))['collaborator_common_names']
   
@@ -77,6 +106,11 @@ if __name__ == '__main__':
     parser.add_argument('--resume', '-r', type=bool, default=False)
     parser.add_argument('--collaborators_file', '-c', type=str, required=True, help="Name of YAML File in /bin/federations/collaborator_lists/")
     parser.add_argument('--data_config_fname', '-dc', type=str, default="local_data_config.yaml")
+    # FIXME: a more general solution of passing model and data kwargs should be provided
+    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=True)
+    parser.add_argument('--data_in_memory', '-dim', type=bool, default=False)
+    parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=1)
+    parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=0)
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
