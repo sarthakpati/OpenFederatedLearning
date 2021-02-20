@@ -15,6 +15,7 @@ import time
 import os
 import logging
 import time
+import hashlib
 
 import numpy as np
 import yaml
@@ -74,6 +75,9 @@ class Aggregator(object):
                  init_metadata_fname=None,
                  latest_metadata_fname=None,
                  send_metadata_to_clients=False,
+                 save_all_models_path=None,
+                 runtime_aggregator_config_dir=None,
+                 runtime_configurable_params=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
@@ -88,6 +92,13 @@ class Aggregator(object):
         self.straggler_cutoff_time = straggler_cutoff_time
         self.round_start_time = None
         self.single_col_cert_common_name = single_col_cert_common_name
+
+        self.save_all_models_path = save_all_models_path
+        self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
+        self.runtime_configurable_params = runtime_configurable_params
+
+        if self.runtime_aggregator_config_dir is not None:
+            self.update_config_from_filesystem()
 
         if self.single_col_cert_common_name is not None:
             self.log_big_warning()
@@ -122,6 +133,65 @@ class Aggregator(object):
         self.metadata['aggregator_uuid'] = aggregator_uuid
         self.metadata['federation_uuid'] = federation_uuid
         self.metadata_for_round = {}
+
+    def update_config_from_filesystem(self):
+        if self.runtime_aggregator_config_dir is None:
+            return
+
+        if self.runtime_configurable_params is None:
+            return
+
+        # make the directory for convenience
+        config_dir = os.path.join(self.runtime_aggregator_config_dir, self.federation_uuid)
+        os.makedirs(config_dir, exist_ok=True)
+
+        config_file = os.path.join(config_dir, 'agg_control.yaml')
+
+        if os.path.exists(config_file):
+            config = load_yaml(config_file)
+            self.logger.info("Updating aggregator config from {}".format(config_file))
+        else:
+            self.logger.info("Aggregator did not find config file: {}".format(config_file))
+            return
+
+        for k, v in config.items():
+            if k not in self.runtime_configurable_params:
+                self.logger.warning("Aggregator config file contains {}. This is not allowed by the flplan.".format(k))
+            elif not hasattr(self, k):
+                self.logger.warning("Aggregator config file contains {}. This is not a valid aggregator parameter".format(k))
+            else:
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
+
+    def ensure_save_all_path_exists(self):
+        if self.save_all_models_path is None:
+            return
+
+        dir_path = os.path.join(self.save_all_models_path, str(self.federation_uuid), str(self.round_num))
+        os.makedirs(dir_path, exist_ok=True)
+        return dir_path
+
+    def save_aggregated_model(self):
+        if self.save_all_models_path is None:
+            return
+
+        dir_path = self.ensure_save_all_path_exists()
+
+        dump_proto(self.model, os.path.join(dir_path, "aggregated.pbuf"))
+
+    def save_local_update(self, collaborator, update):
+        if self.save_all_models_path is None:
+            return
+
+        # FIXME: better user experience would be good
+        # hash the collaborator name so we can ensure directory names are legal
+        md5 = hashlib.md5()
+        md5.update(collaborator.encode())
+        hashed_col = md5.hexdigest()[:8]
+
+        dir_path = self.ensure_save_all_path_exists()
+
+        dump_proto(update, os.path.join(dir_path, "{}.pbuf".format(hashed_col)))
 
     def valid_collaborator_CN_and_id(self, cert_common_name, collaborator_common_name):
         """Determine if the collaborator certificate and ID are valid for this federation.
@@ -321,6 +391,10 @@ class Aggregator(object):
         # Save the new model as latest model.
         dump_proto(self.model, self.latest_model_fpath)
 
+        # if configured, also save to the backup location
+        if self.save_all_models_path is not None:
+            self.save_aggregated_model()
+
         # in case that round_val is a dictionary (asuming one level only), basing best model on average of inner value
         if isinstance(round_val, dict):
             model_score = np.average(list(round_val.values()))
@@ -337,6 +411,10 @@ class Aggregator(object):
 
         # clear the update pointer
         self.model_update_in_progress = None
+
+        # if we have enabled runtime configuration updates, do that now
+        if self.runtime_aggregator_config_dir is not None:
+            self.update_config_from_filesystem()
 
         self.init_per_col_round_stats()
 
@@ -375,6 +453,10 @@ class Aggregator(object):
             # ensure we haven't received an update from this collaborator already
             check_not_in(message.header.sender, self.per_col_round_stats["loss_results"], self.logger)
             check_not_in(message.header.sender, self.per_col_round_stats["collaborator_training_sizes"], self.logger)
+
+            # dump the local update, if necessary
+            if self.save_all_models_path is not None:
+                self.save_local_update(message.header.sender, message.model)
 
             # if this is our very first update for the round, we take these model tensors as-is
             # FIXME: move to model deltas, add with original to reconstruct
