@@ -77,7 +77,7 @@ class Aggregator(object):
                  send_metadata_to_clients=False,
                  save_all_models_path=None,
                  runtime_aggregator_config_dir=None,
-                 runtime_configurable_params=['rounds_to_train', 'straggler_cutoff_time', 'minimum_reporting'],
+                 runtime_configurable_params=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
@@ -136,6 +136,9 @@ class Aggregator(object):
 
     def update_config_from_filesystem(self):
         if self.runtime_aggregator_config_dir is None:
+            return
+
+        if self.runtime_configurable_params is None:
             return
 
         # make the directory for convenience
