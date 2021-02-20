@@ -31,9 +31,7 @@ def main(plan,
          data_dir,
          validate_on_patches,
          data_in_memory, 
-         data_patch_size, 
          data_queue_max_length, 
-         data_queue_samples_per_volume, 
          data_queue_num_workers,  
          logging_config_path, 
          logging_default_level, 
@@ -107,9 +105,7 @@ if __name__ == '__main__':
     # FIXME: a more general solution of passing model and data kwargs should be provided
     parser.add_argument('--validate_on_patches', '-vp', type=bool, default=True)
     parser.add_argument('--data_in_memory', '-dim', type=bool, default=False)
-    parser.add_argument('--data_patch_size', '-dps', type=int, nargs='+', default=None)
     parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=1)
-    parser.add_argument('--data_queue_samples_per_volume', '-dqspv', type=int, default=1)
     parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=0)
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
