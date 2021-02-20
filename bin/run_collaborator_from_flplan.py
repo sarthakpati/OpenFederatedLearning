@@ -28,7 +28,13 @@ def main(plan,
          collaborator_common_name, 
          single_col_cert_common_name, 
          data_config_fname, 
-         data_dir, 
+         data_dir,
+         validate_on_patches,
+         data_in_memory, 
+         data_patch_size, 
+         data_queue_max_length, 
+         data_queue_samples_per_volume, 
+         data_queue_num_workers,  
          logging_config_path, 
          logging_default_level, 
          logging_directory, 
@@ -56,6 +62,19 @@ def main(plan,
     setup_logging(path=logging_config_path, default_level=logging_default_level, logging_directory=logging_directory)
     
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
+
+    # FIXME: Find a better solution for passing model and data kwargs through the plan
+    model_init_kwarg_keys = ['validate_on_patches']
+    model_init_kwarg_vals = [validate_on_patches]
+    for key, value in zip(model_init_kwarg_keys, model_init_kwarg_values):
+        flplan['model_object_init']['init_kwargs'][key] = value
+        WORKING HERE< GET THE STRING OF VARIABLE
+
+
+    data_init_kwarg_keys = ['data_in_memory', 'data_patch_size', 'data_queue_max_length', 'data_queue_samples_per_volume', 'data_queue_num_workers']
+    data_init_kwarg_vals = [data_in_memory,data_patch_size, data_queue_max_length, 
+         data_queue_samples_per_volume, 
+         data_queue_num_workers]
 
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
 
@@ -85,6 +104,13 @@ if __name__ == '__main__':
     parser.add_argument('--data_config_fname', '-dc', type=str, default="local_data_config.yaml")
     # FIXME: data_dir should be data_path
     parser.add_argument('--data_dir', '-d', type=str, default=None)
+    # FIXME: a more general solution of passing model and data kwargs should be provided
+    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=True)
+    parser.add_argument('--data_in_memory', '-dim', type=bool, default=False)
+    parser.add_argument('--data_patch_size', '-dps', type=int, nargs='+', default=None)
+    parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=1)
+    parser.add_argument('--data_queue_samples_per_volume', '-dqspv', type=int, default=1)
+    parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=0)
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
