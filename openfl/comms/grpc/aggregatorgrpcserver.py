@@ -154,22 +154,9 @@ class AggregatorGRPCServer(AggregatorServicer):
 
         logger.info('Starting aggregator.')
         server.start()
-        # FIXME: We should really use a signal handler for this
-        # On the first CTRL+C, we set the aggregator so that it will end after the current round
-        # on the second CTRL+C, we stop the aggregator altogether
-        first_keyboard_interrupt = True
-        while True:
-            try:
-                while not self.aggregator.all_quit_jobs_sent():
-                    time.sleep(5)
-                # getting here means no CTRL+C
-                break
-            except KeyboardInterrupt:
-                if not first_keyboard_interrupt:
-                    # getting here means second CTRL+C
-                    break
-                first_keyboard_interrupt = False
-                logger.info('AGGREGATOR WILL STOP AT END OF THIS ROUND')
-                logger.info('Raise KeyboardInterrupt again to terminate process')
-                self.aggregator.stop_at_end_of_round()
+        try:
+            while not self.aggregator.all_quit_jobs_sent():
+                time.sleep(5)
+        except KeyboardInterrupt:
+            pass
         server.stop(0)

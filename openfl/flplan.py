@@ -143,6 +143,7 @@ def get_serve_kwargs_from_flpan(flplan, base_dir):
 def create_aggregator_object_from_flplan(flplan,
                                          collaborator_common_names,
                                          single_col_cert_common_name,
+                                         base_dir,
                                          weights_dir,
                                          metadata_dir,
                                          resume):
@@ -154,9 +155,14 @@ def create_aggregator_object_from_flplan(flplan,
     init_kwargs['single_col_cert_common_name']  = single_col_cert_common_name
 
     # FIXME: this sort of hackery should be handled by a filesystem abstraction
-    # path in the full model filepaths
+    # patch in the full model filepaths
     for p in ['init', 'latest', 'best']:
         init_kwargs['{}_model_fpath'.format(p)] = os.path.join(weights_dir, init_kwargs['{}_model_fname'.format(p)])
+
+    # FIXME: this sort of hackery should be handled by a filesystem abstraction
+    # patch in the base dir
+    if 'runtime_aggregator_config_dir' in init_kwargs:
+        init_kwargs['runtime_aggregator_config_dir'] = os.path.join(base_dir, init_kwargs['runtime_aggregator_config_dir'])
 
     # FIXME: this sort of hackery should be handled by a filesystem abstraction
     # patch in full metadata filepaths
