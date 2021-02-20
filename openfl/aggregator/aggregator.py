@@ -147,15 +147,18 @@ class Aggregator(object):
         if os.path.exists(config_file):
             config = load_yaml(config_file)
             self.logger.info("Updating aggregator config from {}".format(config_file))
-            self.logger.info("Config file contents:\n{}".format(config))
         else:
             self.logger.info("Aggregator did not find config file: {}".format(config_file))
             return
 
-        for param in self.runtime_configurable_params:
-            if param in config:
-                setattr(self, param, config[param])
-                self.logger.info("Aggregator config {} updated to {}".format(param, config[param]))
+        for k, v in config.items():
+            if k not in self.runtime_configurable_params:
+                self.logger.warning("Aggregator config file contains {}. This is not allowed by the flplan.".format(k))
+            elif not hasattr(self, k):
+                self.logger.warning("Aggregator config file contains {}. This is not a valid aggregator parameter".format(k))
+            else:
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
 
     def ensure_save_all_path_exists(self):
         if self.save_all_models_path is None:
