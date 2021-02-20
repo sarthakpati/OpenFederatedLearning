@@ -109,18 +109,18 @@ $(openfl_pytorch): $(openfl_pytorch_whl)
 $(openfl_tensorflow): $(openfl_tensorflow_whl) 
 	venv/bin/pip install $(openfl_tensorflow_whl)
 
-$(fets): $(gandlf_whl) $(fets_whl)
+$(fets): $(fets_whl) $(gandlf_whl) 
 	venv/bin/pip install $(fets_whl)
 	venv/bin/pip install $(gandlf_whl) 
 	
 
 install_openfl: $(openfl)
 
-install_openfl_pytorch: $(openfl_pytorch) $(openfl)
+install_openfl_pytorch: $(openfl) $(openfl_pytorch) 
 
-install_openfl_tensorflow: $(openfl_tensorflow) $(openfl)
+install_openfl_tensorflow: $(openfl) $(openfl_tensorflow)
 
-install_fets: $(fets) $(openfl_pytorch) $(openfl)
+install_fets: $(openfl) $(openfl_pytorch) $(fets)
 
 install: install_openfl install_openfl_pytorch install_openfl_tensorflow
 
