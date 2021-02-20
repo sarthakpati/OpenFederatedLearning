@@ -333,9 +333,17 @@ class Collaborator(object):
         else:
             batches_per_epoch = int(np.ceil(data_size/self.wrapped_model.data.batch_size))
             num_batches = int(np.floor(batches_per_epoch * self.epochs_per_round))
-        loss = self.wrapped_model.train_batches(num_batches=num_batches)
+        train_info = self.wrapped_model.train_batches(num_batches=num_batches)
+
         self.logger.debug("{} Completed the training job for {} batches.".format(self, num_batches))
 
+        # allowing extra information regarding training to be logged (for now none of the extra info is sent to the aggregator)
+        if isinstance(train_info, dict):
+            loss = train_info["loss"]
+            self.logger.debug("{} model is returning dictionary of training info: {}".format(self, train_info))
+        else:
+            loss = train_info
+ 
         # get the trained tensor dict and store any designated to be held out from aggregation
         shared_tensors = self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
 
@@ -379,6 +387,10 @@ class Collaborator(object):
         results = self.wrapped_model.validate()
         self.logger.debug("{} - Completed the validation job.".format(self))
         data_size = self.wrapped_model.get_validation_data_size()
+
+        # FIXME: this is a hack to help with older models that don't return dictionaries
+        if not isinstance(results, dict):
+            results = {'validation': results}
 
         reply = self.channel.UploadLocalMetricsUpdate(LocalValidationResults(header=self.create_message_header(), model_header=self.model_header, results=results, data_size=data_size))
         self.validate_header(reply)

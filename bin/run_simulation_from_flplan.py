@@ -23,7 +23,7 @@ from single_proc_fed    import federate
 from setup_logging      import setup_logging
 
 
-def main(plan, collaborators_file, data_config_fname, logging_config_path, logging_default_level, logging_directory, model_device, **kwargs):
+def main(plan, resume, collaborators_file, data_config_fname, logging_config_path, logging_default_level, logging_directory, model_device, **kwargs):
     """Run the federation simulation from the federation (FL) plan.
 
     Runs a federated training from the federation (FL) plan but creates the
@@ -61,18 +61,20 @@ def main(plan, collaborators_file, data_config_fname, logging_config_path, loggi
   
     # TODO: Run a loop here over various parameter values and iterations
     # TODO: implement more than just saving init, best, and latest model
-    federate(flplan,
-             local_config,
-             collaborator_common_names,
-             base_dir,
-             weights_dir,
-             metadata_dir,
-             model_device)
+    federate(flplan=flplan,
+             resume=resume,
+             local_config=local_config,
+             collaborator_common_names=collaborator_common_names,
+             base_dir=base_dir,
+             weights_dir=weights_dir,
+             metadata_dir=metadata_dir,
+             model_device=model_device)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--plan', '-p', type=str, required=True)
+    parser.add_argument('--resume', '-r', type=bool, default=False)
     parser.add_argument('--collaborators_file', '-c', type=str, required=True, help="Name of YAML File in /bin/federations/collaborator_lists/")
     parser.add_argument('--data_config_fname', '-dc', type=str, default="local_data_config.yaml")
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")

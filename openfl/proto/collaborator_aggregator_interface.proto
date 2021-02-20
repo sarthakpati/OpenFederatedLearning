@@ -20,7 +20,7 @@ package openfl_proto;
 
 service Aggregator {
     rpc RequestJob(JobRequest) returns (JobReply) {}
-    rpc DownloadModel(ModelDownloadRequest) returns (stream DataStream) {}
+    rpc DownloadLayer(LayerDownloadRequest) returns (stream DataStream) {}
     // rpc UploadLocalModelUpdate(stream DataStream) returns (LocalModelUpdateAck) {}
     rpc UploadLocalLossResults(LocalLossResults) returns (LocalLossResultsAck) {}
     rpc UploadLocalLayerUpdate(stream DataStream) returns (LocalLayerUpdateAck) {}
@@ -111,8 +111,7 @@ message LocalValidationResults {
     MessageHeader header = 1;
     ModelHeader model_header = 2;
     // Python Dictionary
-    // map<string, float> results = 3;
-    float results =3;
+    map<string, float> results = 3;
     int32 data_size = 4;
 }
 
@@ -121,9 +120,10 @@ message JobRequest {
     ModelHeader model_header = 2;
 }
 
-message ModelDownloadRequest {
+message LayerDownloadRequest {
     MessageHeader header = 1;
     ModelHeader model_header = 2;
+    repeated string layers_already_downloaded = 3;
 }
 
 message RoundTaskQuery {
@@ -133,9 +133,16 @@ message RoundTaskQuery {
 
 // AGGREGATOR MESSAGES
 
-message GlobalModelUpdate {
+// message GlobalModelUpdate {
+//     MessageHeader header = 1;
+//     ModelProto model = 2;
+//     bool is_global_best = 3;
+//     string metadata_yaml = 4;
+// }
+
+message GlobalLayerUpdate {
     MessageHeader header = 1;
-    ModelProto model = 2;
+    LayerProto layer = 2;
     bool is_global_best = 3;
     string metadata_yaml = 4;
 }

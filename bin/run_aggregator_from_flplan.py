@@ -57,6 +57,7 @@ def main(plan,
     agg             = create_aggregator_object_from_flplan(flplan,
                                                            collaborator_common_names,
                                                            single_col_cert_common_name,
+                                                           base_dir,
                                                            weights_dir,
                                                            metadata_dir,
                                                            resume)

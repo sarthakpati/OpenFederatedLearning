@@ -1,4 +1,10 @@
-# Welcome to OpenFL
+# Open Federated Learning has Moved!
+
+Open Federated Learning has graduated to a production open-source project, found at https://github.com/intel/openfl!
+
+This repository will be deprecated once we migrate partners to the new codebase. Thanks for your patience, and check out the new Open Federated Learning above!
+
+# Welcome to Open Federated Learning
 
 See the documentation at: https://openfederatedlearning.readthedocs.io/en/latest/index.html
 
