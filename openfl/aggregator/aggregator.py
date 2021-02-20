@@ -76,6 +76,8 @@ class Aggregator(object):
                  latest_metadata_fname=None,
                  send_metadata_to_clients=False,
                  save_all_models_path=None,
+                 runtime_aggregator_config_dir=None,
+                 runtime_configurable_params=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
@@ -92,6 +94,11 @@ class Aggregator(object):
         self.single_col_cert_common_name = single_col_cert_common_name
 
         self.save_all_models_path = save_all_models_path
+        self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
+        self.runtime_configurable_params = runtime_configurable_params
+
+        if self.runtime_aggregator_config_dir is not None:
+            self.update_config_from_filesystem()
 
         if self.single_col_cert_common_name is not None:
             self.log_big_warning()
@@ -127,8 +134,34 @@ class Aggregator(object):
         self.metadata['federation_uuid'] = federation_uuid
         self.metadata_for_round = {}
 
-    def stop_at_end_of_round(self):
-        self.rounds_to_train = self.round_num
+    def update_config_from_filesystem(self):
+        if self.runtime_aggregator_config_dir is None:
+            return
+
+        if self.runtime_configurable_params is None:
+            return
+
+        # make the directory for convenience
+        config_dir = os.path.join(self.runtime_aggregator_config_dir, self.federation_uuid)
+        os.makedirs(config_dir, exist_ok=True)
+
+        config_file = os.path.join(config_dir, 'agg_control.yaml')
+
+        if os.path.exists(config_file):
+            config = load_yaml(config_file)
+            self.logger.info("Updating aggregator config from {}".format(config_file))
+        else:
+            self.logger.info("Aggregator did not find config file: {}".format(config_file))
+            return
+
+        for k, v in config.items():
+            if k not in self.runtime_configurable_params:
+                self.logger.warning("Aggregator config file contains {}. This is not allowed by the flplan.".format(k))
+            elif not hasattr(self, k):
+                self.logger.warning("Aggregator config file contains {}. This is not a valid aggregator parameter".format(k))
+            else:
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
 
     def ensure_save_all_path_exists(self):
         if self.save_all_models_path is None:
@@ -378,6 +411,10 @@ class Aggregator(object):
 
         # clear the update pointer
         self.model_update_in_progress = None
+
+        # if we have enabled runtime configuration updates, do that now
+        if self.runtime_aggregator_config_dir is not None:
+            self.update_config_from_filesystem()
 
         self.init_per_col_round_stats()
 

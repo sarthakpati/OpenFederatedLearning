@@ -43,6 +43,7 @@ def federate(flplan,
     aggregator = create_aggregator_object_from_flplan(flplan,
                                                       collaborator_common_names,
                                                       None,
+                                                      base_dir,
                                                       weights_dir,
                                                       metadata_dir, 
                                                       resume=resume)
