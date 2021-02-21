@@ -85,12 +85,12 @@ def main(plan,
         if value is not None:
             flplan['model_object_init']['init_kwargs'][key] = value
 
-    data_init_kwarg_keys = ['data_in_memory', 'data_queue_max_length', 'data_queue_num_workers']
+    data_init_kwarg_keys = ['in_memory', 'q_max_length', 'q_num_workers']
     data_init_kwarg_vals = [data_in_memory,data_queue_max_length, data_queue_num_workers]
     for key, value in zip(data_init_kwarg_keys, data_init_kwarg_vals):
         if value is not None:
             flplan['data_object_init']['init_kwargs'][key] = value
-
+    
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
     collaborator_common_names = load_yaml(os.path.join(collaborators_dir, collaborators_file))['collaborator_common_names']
   
