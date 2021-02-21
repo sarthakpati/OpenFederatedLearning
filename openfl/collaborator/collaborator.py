@@ -406,36 +406,52 @@ class Collaborator(object):
         # time the download
         download_start = time.time()
 
-        # sanity check on version is implicit in send
-        # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
-        # an exception can happen in cases where we simply need to retry
-        try:
-            reply = self.channel.DownloadModel(ModelDownloadRequest(header=self.create_message_header(), model_header=self.model_header))
-        except Exception as e:
-            self.logger.exception(repr(e))
-            self.logger.warning("Retrying download of model")
-            reply = self.channel.DownloadModel(ModelDownloadRequest(header=self.create_message_header(), model_header=self.model_header))
+        # download each layer
+        tensors_downloaded = []
+        request = LayerDownloadRequest(header=self.create_message_header(),
+                                       model_header=self.model_header),
+                                       layers_already_downloaded=[])
+        # if we get a header for a more recent model, we need to reset our layers already downloaded
+        model_header = None
+        metadata_yaml = None
+        is_global_best = False
+        while True:
+            request.layers_already_downloaded = [t.name for t in tensors_downloaded]
+            # sanity check on version is implicit in send
+            # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
+            # an exception can happen in cases where we simply need to retry
+            try:
+                reply = self.channel.DownloadLayer(request)
+            except Exception as e:
+                self.logger.exception(repr(e))
+                self.logger.warning("Retrying download of next layer")
+                reply = self.channel.DownloadLayer(request)
+            
+            # validation of reply
+            check_type(reply, GlobalLayerUpdate, self.logger)
+            self.validate_header(reply)
 
-        received_model_proto = reply.model
-        received_model_version = received_model_proto.header.version
-
-        # handling possability that the recieved model is delta
-        received_model_is_delta = received_model_proto.header.is_delta
-        received_model_delta_from_version = received_model_proto.header.delta_from_version
-
+            # if newer version than previous layer, reset layers_already_downloaded
+            if model_header is None or reply.layer.header.version > model_header.version:
+                model_header = reply.layer.header
+                tensors_downloaded = [reply.layer.tensor]
+            # otherwise, append to our list and check if we can break
+            else:
+                tensors_downloaded.append(reply.layer.tensor)
+                if reply.is_last_layer:
+                    # set the metadata and global best values
+                    metadata_yaml = reply.metadata_yaml
+                    is_global_best = reply.is_global_best
+                    break
 
         self.logger.info("{} took {} seconds to download the model".format(self, round(time.time() - download_start, 3)))
-
-        self.validate_header(reply)
         self.logger.info("{} - Completed the model downloading job.".format(self))
 
-        check_type(reply, GlobalModelUpdate, self.logger)
-
         # ensure we actually got a new model version
-        check_not_equal(received_model_version, self.model_header.version, self.logger)
+        check_not_equal(model_header.version, self.model_header.version, self.logger)
 
         # set our model header
-        self.model_header = received_model_proto.header
+        self.model_header = model_header
 
         # compute the aggregated tensors dict from the model proto
         agg_tensor_dict = deconstruct_proto(model_proto=received_model_proto, compression_pipeline=self.compression_pipeline)

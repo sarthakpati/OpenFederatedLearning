@@ -145,6 +145,7 @@ message GlobalLayerUpdate {
     LayerProto layer = 2;
     bool is_global_best = 3;
     string metadata_yaml = 4;
+    bool is_last_layer = 5;
 }
 
 message JobReply {

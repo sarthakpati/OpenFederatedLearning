@@ -106,7 +106,7 @@ class Aggregator(object):
             self.single_col_cert_common_name = '' # FIXME: '' instead of None is just for protobuf compatibility. Cleaner solution?
 
         # FIXME: Should we do anything to insure the intial model is compressed?
-        self.model = load_proto(init_model_fpath)
+        self.set_model_to(load_proto(init_model_fpath))
         self.logger.info("Loaded initial model from {}".format(init_model_fpath))
         self.logger.info("Initial model version is {}".format(self.model.header.version))
 
@@ -367,12 +367,12 @@ class Aggregator(object):
         self.logger.info('\tloss: {}'.format(round_loss))
 
         # construct the model protobuf from in progress tensors (with incremented version number)
-        self.model = construct_proto(tensor_dict=self.model_update_in_progress["tensor_dict"],
-                                     model_id=self.model.header.id,
-                                     model_version=self.model.header.version + 1,
-                                     is_delta=self.model_update_in_progress["is_delta"],
-                                     delta_from_version=self.model_update_in_progress["delta_from_version"],
-                                     compression_pipeline=self.compression_pipeline)
+        self.set_model_to(construct_proto(tensor_dict=self.model_update_in_progress["tensor_dict"],
+                                          model_id=self.model.header.id,
+                                          model_version=self.model.header.version + 1,
+                                          is_delta=self.model_update_in_progress["is_delta"],
+                                          delta_from_version=self.model_update_in_progress["delta_from_version"],
+                                          compression_pipeline=self.compression_pipeline))
 
         # add end of round metadata
         self.metadata_for_round.update(self.get_end_of_round_metadata())
@@ -422,6 +422,10 @@ class Aggregator(object):
         self.logger.debug("Start a new round %d." % self.round_num)
         self.round_start_time = None
 
+    def set_model_to(self, model):
+        self.mutex.acquire(blocking=True)
+        self.model = model
+        self.layers_in_model = [t.name for t in self.model.tensors]
 
     def UploadLocalModelUpdate(self, message):
         """Parses the collaborator reply message to get the collaborator model update
@@ -643,8 +647,8 @@ class Aggregator(object):
 
         return reply
 
-    def DownloadModel(self, message):
-        """Sends a model to the collaborator
+    def DownloadLayer(self, message):
+        """Sends a layer to the collaborator
 
         Args:
             message: Message from the collaborator
@@ -657,7 +661,7 @@ class Aggregator(object):
         t = time.time()
         self.validate_header(message)
 
-        self.logger.info("Received model download request from %s " % message.header.sender)
+        self.logger.info("Received layer download request from %s " % message.header.sender)
 
         # ensure the models don't match
         if not(self.collaborator_out_of_date(message.model_header)):
@@ -675,13 +679,33 @@ class Aggregator(object):
             # TODO: In the future we could send non-delta model here to restore base model.
             raise NotImplementedError('Base of download model delta does not match current collaborator base, and aggregator restoration of base model not implemented.')
 
+        # determine the next tensor to send
+        layers_remaining = np.setdiff1d(self.layers_in_model, messages.layers_already_downloaded)
+        if layers_remaining.size == 0:
+            raise RuntimeError("Erroneous layer request. Collaborator already has all layers!")
+
+        for t in self.model.tensors:
+            if t.name == layers_remaining[0]
+                tensor_to_send = t
+                break
+        
+        if tensor_to_send is None:
+            raise RuntimeError("{} not found in model!".format(layers_remaining[0]))
+
+        # we only send metadata with the first layer
         metadata_yaml = None
-        if self.send_metadata_to_clients:
+        if self.send_metadata_to_clients and len(layers_already_downloaded) == 0:
             metadata_yaml = yaml.dump(self.metadata)
 
-        reply = GlobalModelUpdate(header=self.create_reply_header(message), model=self.model, is_global_best=self.aggregated_model_is_global_best, metadata_yaml=metadata_yaml)
+        is_last_layer = layers_remaining.size == 1
 
-        self.logger.debug('aggregator handled RequestJob in time {}'.format(time.time() - t))
+        reply = GlobalLayerUpdate(header=self.create_reply_header(message),
+                                  layer=LayerProto(header=self.model.header, tensor=tensor_to_send),
+                                  is_global_best=self.aggregated_model_is_global_best,
+                                  metadata_yaml=metadata_yaml,
+                                  is_last_layer=is_last_layer)
+
+        self.logger.debug('aggregator handled DownloadLayer in time {}'.format(time.time() - t))
 
         return reply
 
