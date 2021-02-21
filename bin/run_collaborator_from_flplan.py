@@ -67,15 +67,17 @@ def main(plan,
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
 
     # FIXME: Find a better solution for passing model and data init kwargs
-    model_init_kwarg_keys = ['validate_on_patches']
-    model_init_kwarg_vals = [validate_on_patches]
+    model_init_kwarg_keys = ['validate_on_patches', 'torch_threads', 'kmp_affinity']
+    model_init_kwarg_vals = [validate_on_patches, torch_threads, kmp_affinity]
     for key, value in zip(model_init_kwarg_keys, model_init_kwarg_vals):
-        flplan['model_object_init']['init_kwargs'][key] = value
+        if value is not None:
+            flplan['model_object_init']['init_kwargs'][key] = value
 
     data_init_kwarg_keys = ['data_in_memory', 'data_queue_max_length', 'data_queue_num_workers']
     data_init_kwarg_vals = [data_in_memory,data_queue_max_length, data_queue_num_workers]
     for key, value in zip(data_init_kwarg_keys, data_init_kwarg_vals):
-        flplan['data_object_init']['init_kwargs'][key] = value
+        if value is not None:
+            flplan['data_object_init']['init_kwargs'][key] = value
 
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
 
@@ -106,10 +108,10 @@ if __name__ == '__main__':
     # FIXME: data_dir should be data_path
     parser.add_argument('--data_dir', '-d', type=str, default=None)
     # FIXME: a more general solution of passing model and data kwargs should be provided
-    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=True)
-    parser.add_argument('--data_in_memory', '-dim', type=bool, default=False)
-    parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=1)
-    parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=0)
+    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=None)
+    parser.add_argument('--data_in_memory', '-dim', type=bool, default=None)
+    parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=None)
+    parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=None)
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")

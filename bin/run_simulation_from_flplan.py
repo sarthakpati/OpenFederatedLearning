@@ -31,6 +31,8 @@ def main(plan,
          data_in_memory, 
          data_queue_max_length, 
          data_queue_num_workers,
+         torch_threads, 
+         kmp_affinity,
          logging_config_path, 
          logging_default_level, 
          logging_directory, 
@@ -52,6 +54,8 @@ def main(plan,
         data_in_memory          : data init kwarg 
         data_queue_max_length   : data init kwarg 
         data_queue_num_workers  : data init kwarg
+        torch_threads           : number of threads to set in torch 
+        kmp_affinity            : whether or not to include a hard-coded KMP AFFINITY setting
         logging_config_path     : The log file
         logging_default_level   : The log level
         **kwargs                : Variable parameters to pass to the function
@@ -75,15 +79,17 @@ def main(plan,
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
 
     # FIXME: Find a better solution for passing model and data init kwargs
-    model_init_kwarg_keys = ['validate_on_patches']
-    model_init_kwarg_vals = [validate_on_patches]
+    model_init_kwarg_keys = ['validate_on_patches', 'torch_threads', 'kmp_affinity']
+    model_init_kwarg_vals = [validate_on_patches, torch_threads, kmp_affinity]
     for key, value in zip(model_init_kwarg_keys, model_init_kwarg_vals):
-        flplan['model_object_init']['init_kwargs'][key] = value
+        if value is not None:
+            flplan['model_object_init']['init_kwargs'][key] = value
 
     data_init_kwarg_keys = ['data_in_memory', 'data_queue_max_length', 'data_queue_num_workers']
     data_init_kwarg_vals = [data_in_memory,data_queue_max_length, data_queue_num_workers]
     for key, value in zip(data_init_kwarg_keys, data_init_kwarg_vals):
-        flplan['data_object_init']['init_kwargs'][key] = value
+        if value is not None:
+            flplan['data_object_init']['init_kwargs'][key] = value
 
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
     collaborator_common_names = load_yaml(os.path.join(collaborators_dir, collaborators_file))['collaborator_common_names']
@@ -107,10 +113,12 @@ if __name__ == '__main__':
     parser.add_argument('--collaborators_file', '-c', type=str, required=True, help="Name of YAML File in /bin/federations/collaborator_lists/")
     parser.add_argument('--data_config_fname', '-dc', type=str, default="local_data_config.yaml")
     # FIXME: a more general solution of passing model and data kwargs should be provided
-    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=True)
-    parser.add_argument('--data_in_memory', '-dim', type=bool, default=False)
-    parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=1)
-    parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=0)
+    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=None)
+    parser.add_argument('--data_in_memory', '-dim', type=bool, default=None)
+    parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=None)
+    parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=None)
+    parser.add_argument('--torch_threads', '-td', type=int, default=None)
+    parser.add_argument('--kmp_affinity', '-ka', type=bool, default=None)
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
