@@ -113,7 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('--collaborators_file', '-c', type=str, required=True, help="Name of YAML File in /bin/federations/collaborator_lists/")
     parser.add_argument('--data_config_fname', '-dc', type=str, default="local_data_config.yaml")
     # FIXME: a more general solution of passing model and data kwargs should be provided
-    parser.add_argument('--validate_without_patches_flag', '-vp', type=bool, default=None)
+    parser.add_argument('--validate_without_patches_flag', '-vwop', type=bool, default=None)
     parser.add_argument('--data_in_memory_flag', '-dim', type=bool, default=None)
     parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=None)
     parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=None)
