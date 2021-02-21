@@ -117,7 +117,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_in_memory', '-dim', type=bool, default=None)
     parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=None)
     parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=None)
-    parser.add_argument('--torch_threads', '-td', type=int, default=None)
+    parser.add_argument('--torch_threads', '-tt', type=int, default=None)
     parser.add_argument('--kmp_affinity', '-ka', type=bool, default=None)
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
