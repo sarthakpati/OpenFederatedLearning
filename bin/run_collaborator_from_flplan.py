@@ -29,10 +29,12 @@ def main(plan,
          single_col_cert_common_name, 
          data_config_fname, 
          data_dir,
-         validate_on_patches,
-         data_in_memory, 
+         validate_without_patches_flag,
+         data_in_memory_flag, 
          data_queue_max_length, 
-         data_queue_num_workers,  
+         data_queue_num_workers,
+         torch_threads,
+         kmp_affinity_flag,  
          logging_config_path, 
          logging_default_level, 
          logging_directory, 
@@ -40,18 +42,20 @@ def main(plan,
     """Runs the collaborator client process from the federation (FL) plan
 
     Args:
-        plan                        : The filename for the federation (FL) plan YAML file
-        collaborator_common_name    : The common name for the collaborator node
-        single_col_cert_common_name : The SSL certificate for this collaborator
-        data_config_fname           : The dataset configuration filename (YAML)
-        data_dir                    : parent directory holding the patient data subdirectories(to be split into train and val)
-        validate_on_patches         : model init kwarg
-        data_in_memory              : data init kwarg 
-        data_queue_max_length       : data init kwarg 
-        data_queue_num_workers      : data init kwarg
-        logging_config_fname        : The log file
-        logging_default_level       : The log level
-        model_device                : gets passed to model 'init' function as "device"
+        plan                            : The filename for the federation (FL) plan YAML file
+        collaborator_common_name        : The common name for the collaborator node
+        single_col_cert_common_name     : The SSL certificate for this collaborator
+        data_config_fname               : The dataset configuration filename (YAML)
+        data_dir                        : parent directory holding the patient data subdirectories(to be split into train and val)
+        validate_without_patches_flag   : controls a model init kwarg
+        data_in_memory_flag             : controls a data init kwarg 
+        data_queue_max_length           : controls a data init kwarg 
+        data_queue_num_workers          : controls a data init kwarg
+        torch_threads                   : model init kwarg
+        kmp_affinity_flag               : controls a model init kwarg
+        logging_config_fname            : The log file
+        logging_default_level           : The log level
+        model_device                    : gets passed to model 'init' function as "device"
     """
     # FIXME: consistent filesystem (#15)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -67,16 +71,16 @@ def main(plan,
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
 
     # FIXME: Find a better solution for passing model and data init kwargs
-    model_init_kwarg_keys = ['validate_on_patches', 'torch_threads', 'kmp_affinity']
-    model_init_kwarg_vals = [validate_on_patches, torch_threads, kmp_affinity]
+    model_init_kwarg_keys = ['validate_without_patches', 'torch_threads', 'kmp_affinity']
+    model_init_kwarg_vals = [validate_without_patches_flag, torch_threads, kmp_affinity_flag]
     for key, value in zip(model_init_kwarg_keys, model_init_kwarg_vals):
-        if value is not None:
+        if (value is not None) and (value != False):
             flplan['model_object_init']['init_kwargs'][key] = value
 
-    data_init_kwarg_keys = ['data_in_memory', 'data_queue_max_length', 'data_queue_num_workers']
-    data_init_kwarg_vals = [data_in_memory,data_queue_max_length, data_queue_num_workers]
+    data_init_kwarg_keys = ['in_memory', 'q_max_length', 'q_num_workers']
+    data_init_kwarg_vals = [data_in_memory_flag,data_queue_max_length, data_queue_num_workers]
     for key, value in zip(data_init_kwarg_keys, data_init_kwarg_vals):
-        if value is not None:
+        if (value is not None) and (value != False):
             flplan['data_object_init']['init_kwargs'][key] = value
 
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
@@ -108,10 +112,12 @@ if __name__ == '__main__':
     # FIXME: data_dir should be data_path
     parser.add_argument('--data_dir', '-d', type=str, default=None)
     # FIXME: a more general solution of passing model and data kwargs should be provided
-    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=None)
-    parser.add_argument('--data_in_memory', '-dim', type=bool, default=None)
+    parser.add_argument('--validate_without_patches_flag', '-vwop', action='store_true')
+    parser.add_argument('--data_in_memory_flag', '-dim', action='store_true')
     parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=None)
     parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=None)
+    parser.add_argument('--torch_threads', '-tt', type=int, default=None)
+    parser.add_argument('--kmp_affinity_flag', '-ka', action='store_true')
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
