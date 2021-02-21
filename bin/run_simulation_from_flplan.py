@@ -79,14 +79,14 @@ def main(plan,
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
 
     # FIXME: Find a better solution for passing model and data init kwargs
-    model_init_kwarg_keys = ['validate_on_patches', 'torch_threads', 'kmp_affinity']
-    model_init_kwarg_vals = [validate_on_patches, torch_threads, kmp_affinity]
+    model_init_kwarg_keys = ['validate_without_patches', 'torch_threads', 'kmp_affinity']
+    model_init_kwarg_vals = [validate_without_patches_flag, torch_threads, kmp_affinity_flag]
     for key, value in zip(model_init_kwarg_keys, model_init_kwarg_vals):
         if value is not None:
             flplan['model_object_init']['init_kwargs'][key] = value
 
     data_init_kwarg_keys = ['in_memory', 'q_max_length', 'q_num_workers']
-    data_init_kwarg_vals = [data_in_memory,data_queue_max_length, data_queue_num_workers]
+    data_init_kwarg_vals = [data_in_memory_flag,data_queue_max_length, data_queue_num_workers]
     for key, value in zip(data_init_kwarg_keys, data_init_kwarg_vals):
         if value is not None:
             flplan['data_object_init']['init_kwargs'][key] = value
@@ -113,12 +113,12 @@ if __name__ == '__main__':
     parser.add_argument('--collaborators_file', '-c', type=str, required=True, help="Name of YAML File in /bin/federations/collaborator_lists/")
     parser.add_argument('--data_config_fname', '-dc', type=str, default="local_data_config.yaml")
     # FIXME: a more general solution of passing model and data kwargs should be provided
-    parser.add_argument('--validate_on_patches', '-vp', type=bool, default=None)
-    parser.add_argument('--data_in_memory', '-dim', type=bool, default=None)
+    parser.add_argument('--validate_without_patches_flag', '-vp', type=bool, default=None)
+    parser.add_argument('--data_in_memory_flag', '-dim', type=bool, default=None)
     parser.add_argument('--data_queue_max_length', '-dqml', type=int, default=None)
     parser.add_argument('--data_queue_num_workers', '-dqnw', type=int, default=None)
     parser.add_argument('--torch_threads', '-tt', type=int, default=None)
-    parser.add_argument('--kmp_affinity', '-ka', type=bool, default=None)
+    parser.add_argument('--kmp_affinity_flag', '-ka', type=bool, default=None)
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
