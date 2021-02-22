@@ -423,10 +423,20 @@ class Aggregator(object):
         self.round_start_time = None
 
     def set_model_to(self, model):
-        self.mutex.acquire(blocking=True)
         self.model = model
         self.layers_in_model = [t.name for t in self.model.tensors]
 
+    def _synchronized(func):
+        def wrapper(self, *args, **kwargs):
+            self.mutex.acquire(blocking=True)
+            try:
+                ret = func(self, *args, **kwargs)
+            finally:
+                self.mutex.release()
+            return ret
+        return wrapper
+
+    @_synchronized
     def UploadLocalModelUpdate(self, message):
         """Parses the collaborator reply message to get the collaborator model update
 
@@ -437,86 +447,82 @@ class Aggregator(object):
             The reply to the message (usually just the acknowledgement to the collaborator)
 
         """
+        t = time.time()
+        self.validate_header(message)
 
-        self.mutex.acquire(blocking=True)
-        try:
-            t = time.time()
-            self.validate_header(message)
+        self.logger.info("Receive model update from %s " % message.header.sender)
 
-            self.logger.info("Receive model update from %s " % message.header.sender)
+        # Get the model parameters from the model proto and additional model info
+        model_tensors = deconstruct_proto(model_proto=message.model, compression_pipeline=self.compression_pipeline)
+        is_delta = message.model.header.is_delta
+        delta_from_version = message.model.header.delta_from_version
 
-            # Get the model parameters from the model proto and additional model info
-            model_tensors = deconstruct_proto(model_proto=message.model, compression_pipeline=self.compression_pipeline)
-            is_delta = message.model.header.is_delta
-            delta_from_version = message.model.header.delta_from_version
+        # validate this model header
+        check_equal(message.model.header.id, self.model.header.id, self.logger)
+        check_equal(message.model.header.version, self.model.header.version, self.logger)
 
-            # validate this model header
-            check_equal(message.model.header.id, self.model.header.id, self.logger)
-            check_equal(message.model.header.version, self.model.header.version, self.logger)
+        # ensure we haven't received an update from this collaborator already
+        check_not_in(message.header.sender, self.per_col_round_stats["loss_results"], self.logger)
+        check_not_in(message.header.sender, self.per_col_round_stats["collaborator_training_sizes"], self.logger)
 
-            # ensure we haven't received an update from this collaborator already
-            check_not_in(message.header.sender, self.per_col_round_stats["loss_results"], self.logger)
-            check_not_in(message.header.sender, self.per_col_round_stats["collaborator_training_sizes"], self.logger)
+        # dump the local update, if necessary
+        if self.save_all_models_path is not None:
+            self.save_local_update(message.header.sender, message.model)
 
-            # dump the local update, if necessary
-            if self.save_all_models_path is not None:
-                self.save_local_update(message.header.sender, message.model)
+        # if this is our very first update for the round, we take these model tensors as-is
+        # FIXME: move to model deltas, add with original to reconstruct
+        # FIXME: this really only works with a trusted collaborator. Sanity check this against self.model
+        if self.model_update_in_progress is None:
+            self.model_update_in_progress = {"tensor_dict": model_tensors,
+                                                "is_delta": is_delta,
+                                                "delta_from_version": delta_from_version}
 
-            # if this is our very first update for the round, we take these model tensors as-is
-            # FIXME: move to model deltas, add with original to reconstruct
-            # FIXME: this really only works with a trusted collaborator. Sanity check this against self.model
-            if self.model_update_in_progress is None:
-                self.model_update_in_progress = {"tensor_dict": model_tensors,
-                                                 "is_delta": is_delta,
-                                                 "delta_from_version": delta_from_version}
+        # otherwise, we compute the streaming weighted average
+        else:
+            # get the current update size total
+            total_update_size = np.sum(list(self.per_col_round_stats["collaborator_training_sizes"].values()))
 
-            # otherwise, we compute the streaming weighted average
-            else:
-                # get the current update size total
-                total_update_size = np.sum(list(self.per_col_round_stats["collaborator_training_sizes"].values()))
+            # compute the weights for the global vs local tensors for our streaming average
+            weight_g = total_update_size / (message.data_size + total_update_size)
+            weight_l = message.data_size / (message.data_size + total_update_size)
 
-                # compute the weights for the global vs local tensors for our streaming average
-                weight_g = total_update_size / (message.data_size + total_update_size)
-                weight_l = message.data_size / (message.data_size + total_update_size)
+            # The model parameters are represented in float32 and will be transmitted in byte stream.
+            weight_g = weight_g.astype(np.float32)
+            weight_l = weight_l.astype(np.float32)
 
-                # The model parameters are represented in float32 and will be transmitted in byte stream.
-                weight_g = weight_g.astype(np.float32)
-                weight_l = weight_l.astype(np.float32)
+            # FIXME: right now we're really using names just to sanity check consistent ordering
 
-                # FIXME: right now we're really using names just to sanity check consistent ordering
+            # check that the models include the same number of tensors, and that whether or not
+            # it is a delta and from what version is the same
+            check_equal(len(self.model_update_in_progress["tensor_dict"]), len(model_tensors), self.logger)
+            check_equal(self.model_update_in_progress["is_delta"], is_delta, self.logger)
+            check_equal(self.model_update_in_progress["delta_from_version"], delta_from_version, self.logger)
 
-                # check that the models include the same number of tensors, and that whether or not
-                # it is a delta and from what version is the same
-                check_equal(len(self.model_update_in_progress["tensor_dict"]), len(model_tensors), self.logger)
-                check_equal(self.model_update_in_progress["is_delta"], is_delta, self.logger)
-                check_equal(self.model_update_in_progress["delta_from_version"], delta_from_version, self.logger)
+            # aggregate all the model tensors in the tensor_dict
+            # (weighted average of local update l and global tensor g for all l, g)
+            for name, l in model_tensors.items():
+                g = self.model_update_in_progress["tensor_dict"][name]
+                # check that g and l have the same shape
+                check_equal(g.shape, l.shape, self.logger)
 
-                # aggregate all the model tensors in the tensor_dict
-                # (weighted average of local update l and global tensor g for all l, g)
-                for name, l in model_tensors.items():
-                    g = self.model_update_in_progress["tensor_dict"][name]
-                    # check that g and l have the same shape
-                    check_equal(g.shape, l.shape, self.logger)
+                # now store a weighted average into the update in progress
+                self.model_update_in_progress["tensor_dict"][name] = np.average([g, l], weights=[weight_g, weight_l], axis=0)
 
-                    # now store a weighted average into the update in progress
-                    self.model_update_in_progress["tensor_dict"][name] = np.average([g, l], weights=[weight_g, weight_l], axis=0)
+        # store the loss results and training update size
+        self.per_col_round_stats["loss_results"][message.header.sender] = message.loss
+        self.per_col_round_stats["collaborator_training_sizes"][message.header.sender] = message.data_size
 
-            # store the loss results and training update size
-            self.per_col_round_stats["loss_results"][message.header.sender] = message.loss
-            self.per_col_round_stats["collaborator_training_sizes"][message.header.sender] = message.data_size
+        # return LocalModelUpdateAck
+        self.logger.debug("Complete model update from %s " % message.header.sender)
+        reply = LocalModelUpdateAck(header=self.create_reply_header(message))
 
-            # return LocalModelUpdateAck
-            self.logger.debug("Complete model update from %s " % message.header.sender)
-            reply = LocalModelUpdateAck(header=self.create_reply_header(message))
+        self.end_of_round_check()
 
-            self.end_of_round_check()
-
-            self.logger.debug('aggregator handled UploadLocalModelUpdate in time {}'.format(time.time() - t))
-        finally:
-            self.mutex.release()
+        self.logger.debug('aggregator handled UploadLocalModelUpdate in time {}'.format(time.time() - t))
 
         return reply
 
+    @_synchronized
     def UploadLocalMetricsUpdate(self, message):
         """Parses the collaborator reply message to get the collaborator metrics (usually the local validation score)
 
@@ -527,43 +533,38 @@ class Aggregator(object):
             The reply to the message (usually just the acknowledgement to the collaborator)
 
         """
+        t = time.time()
+        self.validate_header(message)
 
-        self.mutex.acquire(blocking=True)
-        try:
-            t = time.time()
-            self.validate_header(message)
+        self.logger.debug("Receive local validation results from %s " % message.header.sender)
+        model_header = message.model_header
 
-            self.logger.debug("Receive local validation results from %s " % message.header.sender)
-            model_header = message.model_header
+        # validate this model header
+        check_equal(model_header.id, self.model.header.id, self.logger)
+        check_equal(model_header.version, self.model.header.version, self.logger)
 
-            # validate this model header
-            check_equal(model_header.id, self.model.header.id, self.logger)
-            check_equal(model_header.version, self.model.header.version, self.logger)
+        sender = message.header.sender
 
-            sender = message.header.sender
+        if sender not in self.per_col_round_stats["agg_validation_results"]:
+            # Pre-train validation
+            # ensure we haven't received an update from this collaborator already
+            # FIXME: is this an error case that should be handled?
+            check_not_in(message.header.sender, self.per_col_round_stats["agg_validation_results"], self.logger)
+            check_not_in(message.header.sender, self.per_col_round_stats["collaborator_validation_sizes"], self.logger)
 
-            if sender not in self.per_col_round_stats["agg_validation_results"]:
-                # Pre-train validation
-                # ensure we haven't received an update from this collaborator already
-                # FIXME: is this an error case that should be handled?
-                check_not_in(message.header.sender, self.per_col_round_stats["agg_validation_results"], self.logger)
-                check_not_in(message.header.sender, self.per_col_round_stats["collaborator_validation_sizes"], self.logger)
+            # store the validation results and validation size
+            self.per_col_round_stats["agg_validation_results"][message.header.sender] = message.results
+            self.per_col_round_stats["collaborator_validation_sizes"][message.header.sender] = message.data_size
+        elif sender not in self.per_col_round_stats["preagg_validation_results"]:
+            # Post-train validation
+            check_not_in(message.header.sender, self.per_col_round_stats["preagg_validation_results"], self.logger)
+            self.per_col_round_stats["preagg_validation_results"][message.header.sender] = message.results
 
-                # store the validation results and validation size
-                self.per_col_round_stats["agg_validation_results"][message.header.sender] = message.results
-                self.per_col_round_stats["collaborator_validation_sizes"][message.header.sender] = message.data_size
-            elif sender not in self.per_col_round_stats["preagg_validation_results"]:
-                # Post-train validation
-                check_not_in(message.header.sender, self.per_col_round_stats["preagg_validation_results"], self.logger)
-                self.per_col_round_stats["preagg_validation_results"][message.header.sender] = message.results
+        reply = LocalValidationResultsAck(header=self.create_reply_header(message))
 
-            reply = LocalValidationResultsAck(header=self.create_reply_header(message))
+        self.end_of_round_check()
 
-            self.end_of_round_check()
-
-            self.logger.debug('aggregator handled UploadLocalMetricsUpdate in time {}'.format(time.time() - t))
-        finally:
-            self.mutex.release()
+        self.logger.debug('aggregator handled UploadLocalMetricsUpdate in time {}'.format(time.time() - t))
 
         self.logger.debug('aggregator handled UploadLocalMetricsUpdate in time {}'.format(time.time() - t))
 
@@ -572,6 +573,7 @@ class Aggregator(object):
     def collaborator_has_trained(self, collaborator):
         return collaborator in self.per_col_round_stats["collaborator_training_sizes"]
 
+    @_synchronized
     def RequestJob(self, message):
         """Parse message for job request and act accordingly.
 
@@ -629,24 +631,17 @@ class Aggregator(object):
 
         if reply.job is not JOB_YIELD:
             # check to see if we need to set our round start time
-            self.mutex.acquire(blocking=True)
-            try:
-                if self.round_start_time is None:
-                    self.round_start_time = time.time()
-            finally:
-                self.mutex.release()
-
+            if self.round_start_time is None:
+                self.round_start_time = time.time()
+            
             self.logger.debug('aggregator handled RequestJob in time {}'.format(time.time() - t))
         elif self.straggler_cutoff_time != np.inf:
             # we have an idle collaborator and a straggler cutoff time, so we should check for early round end
-            self.mutex.acquire(blocking=True)
-            try:
-                self.end_of_round_check()
-            finally:
-                self.mutex.release()
-
+            self.end_of_round_check()
+        
         return reply
 
+    @_synchronized
     def DownloadLayer(self, message):
         """Sends a layer to the collaborator
 
