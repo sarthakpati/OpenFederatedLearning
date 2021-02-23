@@ -15,6 +15,7 @@ import time
 import os
 import logging
 import time
+import hashlib
 
 import numpy as np
 import yaml
@@ -74,16 +75,17 @@ class Aggregator(object):
                  init_metadata_fname=None,
                  latest_metadata_fname=None,
                  send_metadata_to_clients=False,
+                 save_all_models_path=None,
+                 runtime_aggregator_config_dir=None,
+                 runtime_configurable_params=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
         self.federation_uuid = federation_uuid
-        #FIXME: Should we do anything to insure the intial model is compressed?
-        self.model = load_proto(init_model_fpath)
+
         self.latest_model_fpath = latest_model_fpath
         self.best_model_fpath = best_model_fpath
         self.collaborator_common_names = collaborator_common_names
-        self.round_num = 1
         self.rounds_to_train = rounds_to_train
         self.quit_job_sent_to = []
         self.minimum_reporting = minimum_reporting
@@ -91,10 +93,24 @@ class Aggregator(object):
         self.round_start_time = None
         self.single_col_cert_common_name = single_col_cert_common_name
 
+        self.save_all_models_path = save_all_models_path
+        self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
+        self.runtime_configurable_params = runtime_configurable_params
+
+        if self.runtime_aggregator_config_dir is not None:
+            self.update_config_from_filesystem()
+
         if self.single_col_cert_common_name is not None:
             self.log_big_warning()
         else:
             self.single_col_cert_common_name = '' # FIXME: '' instead of None is just for protobuf compatibility. Cleaner solution?
+
+        # FIXME: Should we do anything to insure the intial model is compressed?
+        self.model = load_proto(init_model_fpath)
+        self.logger.info("Loaded initial model from {}".format(init_model_fpath))
+        self.logger.info("Initial model version is {}".format(self.model.header.version))
+
+        self.round_num = self.model.header.version + 1
 
         self.model_update_in_progress = None
 
@@ -117,6 +133,65 @@ class Aggregator(object):
         self.metadata['aggregator_uuid'] = aggregator_uuid
         self.metadata['federation_uuid'] = federation_uuid
         self.metadata_for_round = {}
+
+    def update_config_from_filesystem(self):
+        if self.runtime_aggregator_config_dir is None:
+            return
+
+        if self.runtime_configurable_params is None:
+            return
+
+        # make the directory for convenience
+        config_dir = os.path.join(self.runtime_aggregator_config_dir, self.federation_uuid)
+        os.makedirs(config_dir, exist_ok=True)
+
+        config_file = os.path.join(config_dir, 'agg_control.yaml')
+
+        if os.path.exists(config_file):
+            config = load_yaml(config_file)
+            self.logger.info("Updating aggregator config from {}".format(config_file))
+        else:
+            self.logger.info("Aggregator did not find config file: {}".format(config_file))
+            return
+
+        for k, v in config.items():
+            if k not in self.runtime_configurable_params:
+                self.logger.warning("Aggregator config file contains {}. This is not allowed by the flplan.".format(k))
+            elif not hasattr(self, k):
+                self.logger.warning("Aggregator config file contains {}. This is not a valid aggregator parameter".format(k))
+            else:
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
+
+    def ensure_save_all_path_exists(self):
+        if self.save_all_models_path is None:
+            return
+
+        dir_path = os.path.join(self.save_all_models_path, str(self.federation_uuid), str(self.round_num))
+        os.makedirs(dir_path, exist_ok=True)
+        return dir_path
+
+    def save_aggregated_model(self):
+        if self.save_all_models_path is None:
+            return
+
+        dir_path = self.ensure_save_all_path_exists()
+
+        dump_proto(self.model, os.path.join(dir_path, "aggregated.pbuf"))
+
+    def save_local_update(self, collaborator, update):
+        if self.save_all_models_path is None:
+            return
+
+        # FIXME: better user experience would be good
+        # hash the collaborator name so we can ensure directory names are legal
+        md5 = hashlib.md5()
+        md5.update(collaborator.encode())
+        hashed_col = md5.hexdigest()[:8]
+
+        dir_path = self.ensure_save_all_path_exists()
+
+        dump_proto(update, os.path.join(dir_path, "{}.pbuf".format(hashed_col)))
 
     def valid_collaborator_CN_and_id(self, cert_common_name, collaborator_common_name):
         """Determine if the collaborator certificate and ID are valid for this federation.
@@ -248,18 +323,27 @@ class Aggregator(object):
             self.end_of_round()
 
     def get_weighted_average_of_collaborators(self, value_dict, weight_dict):
-        """Calculate the weighted average of the model updates from the collaborators.
+        """Calculate the weighted average of data from the collaborators.
 
         Args:
-            value_dict: A dictionary of the values (model tensors)
+            value_dict: A dictionary of the values (values can be dictionaries)
             weight_dict: A dictionary of the collaborator weights (percentage of total data size)
 
         Returns:
-            Dictionary of the weights average for all collaborator models
+            Dictionary containing weighted averages across collaborators
 
         """
         cols = [k for k in value_dict.keys() if k in self.collaborator_common_names]
-        return np.average([value_dict[c] for c in cols], weights=[weight_dict[c] for c in cols])
+        # detect if our value dictionary has one or two levels,and if so get the second level keys
+        example_value = value_dict[cols[0]]
+        if isinstance(example_value, float):
+            averages = float(np.average([value_dict[c] for c in cols], weights=[weight_dict[c] for c in cols]))
+        else:
+            averages = {}
+            for key in example_value.keys():
+                averages[key] = float(np.average([value_dict[c][key] for c in cols], weights=[weight_dict[c] for c in cols])) 
+            
+        return averages
 
     def end_of_round(self):
         """Runs required tasks when the training round has ended.
@@ -275,7 +359,7 @@ class Aggregator(object):
                                                                 self.per_col_round_stats["collaborator_validation_sizes"])
 
         # FIXME: is it correct to put this in the metadata?
-        self.metadata_for_round.update({'loss': float(round_loss), 'round_{}_validation'.format(self.round_num-1): float(round_val)})
+        self.metadata_for_round.update({'loss': round_loss, 'round_{}_validation'.format(self.round_num-1): round_val})
 
         # FIXME: proper logging
         self.logger.info('round results for model id/version {}/{}'.format(self.model.header.id, self.model.header.version))
@@ -307,7 +391,15 @@ class Aggregator(object):
         # Save the new model as latest model.
         dump_proto(self.model, self.latest_model_fpath)
 
-        model_score = round_val
+        # if configured, also save to the backup location
+        if self.save_all_models_path is not None:
+            self.save_aggregated_model()
+
+        # in case that round_val is a dictionary (asuming one level only), basing best model on average of inner value
+        if isinstance(round_val, dict):
+            model_score = np.average(list(round_val.values()))
+        else:
+            model_score = round_val
         if self.best_model_score is None or self.best_model_score < model_score:
             self.logger.info("Saved the best model with score {:f}.".format(model_score))
             self.best_model_score = model_score
@@ -319,6 +411,10 @@ class Aggregator(object):
 
         # clear the update pointer
         self.model_update_in_progress = None
+
+        # if we have enabled runtime configuration updates, do that now
+        if self.runtime_aggregator_config_dir is not None:
+            self.update_config_from_filesystem()
 
         self.init_per_col_round_stats()
 
@@ -357,6 +453,10 @@ class Aggregator(object):
             # ensure we haven't received an update from this collaborator already
             check_not_in(message.header.sender, self.per_col_round_stats["loss_results"], self.logger)
             check_not_in(message.header.sender, self.per_col_round_stats["collaborator_training_sizes"], self.logger)
+
+            # dump the local update, if necessary
+            if self.save_all_models_path is not None:
+                self.save_local_update(message.header.sender, message.model)
 
             # if this is our very first update for the round, we take these model tensors as-is
             # FIXME: move to model deltas, add with original to reconstruct
@@ -483,7 +583,11 @@ class Aggregator(object):
         # check if we are done
         if self.round_num > self.rounds_to_train:
             job = JOB_QUIT
-            self.quit_job_sent_to.append(message.header.sender)
+
+            # we may need to send this again if the collaborator process has been restarted for some reason
+            # thus we may not need to add it to the list again
+            if message.header.sender not in self.quit_job_sent_to:
+                self.quit_job_sent_to.append(message.header.sender)
         # FIXME: this flow needs to depend on a job selection output for the round
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
