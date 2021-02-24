@@ -376,7 +376,12 @@ class Collaborator(object):
                 break
             except Exception as e:
                 self.logger.exception(repr(e))
-                self.logger.warning("Retrying upload of model. Try {} of {}".format(i+1, self.num_retries))
+                # if final retry, raise exception
+                if i + 1 == self.num_retries:
+                    raise e
+                else:
+                    self.logger.warning("Retrying upload of model. Try {} of {}".format(i+1, self.num_retries))
+
 
         self.validate_header(reply)
         check_type(reply, LocalModelUpdateAck, self.logger)
@@ -418,7 +423,11 @@ class Collaborator(object):
                 break
             except Exception as e:
                 self.logger.exception(repr(e))
-                self.logger.warning("Retrying download of model. Try {} of {}".format(i+1, self.num_retries))
+                # if final retry, raise exception
+                if i + 1 == self.num_retries:
+                    raise e
+                else:
+                    self.logger.warning("Retrying download of model. Try {} of {}".format(i+1, self.num_retries))
 
         received_model_proto = reply.model
         received_model_version = received_model_proto.header.version
