@@ -438,6 +438,62 @@ class Aggregator(object):
 
     @_synchronized
     def UploadLocalModelUpdate(self, message):
+        self.validate_header(message)
+
+        tensor_name = message.tensor.name
+        collaborator = message.header.sender
+
+        self.logger.info("Received tensor update {} from {}".format(tensor_name, collaborator))
+
+        # validate this model header
+        check_equal(message.model_header.id, self.model_header.id, self.logger)
+
+        # if this collaborator is out of date, we need to tell them to discard the remaining updates
+        if message.model_header.version < self.model_header.version:
+            self.logger.info("{} is out of date. Replying with discard_updates=True".format(collaborator))
+            return LocalTensorUpdateAck(header=self.create_reply_header(message), discard_updates=True)
+
+        # ensure we have a key for this collaborator
+        if collaborator not in self.per_col_received_tensors_this_round:
+            self.per_col_received_tensors_this_round[collaborator] = []
+
+        # only actually aggregate if this collaborator has not already sent this tensor
+        # The case could exist where a collaborator died half-way through sending all tensors, then retrained
+        # For now, we will accept the odd situation where we have updated different tensors according to different training runs.
+        if tensor_name not in self.per_col_received_tensors_this_round[collaborator]:
+            tensor = tensor_proto_to_numpy_array(message.tensor)
+            data_size = message.data_size
+
+            # if this is our very first update for this tensor this round, we take the tensor as-is
+            if self.tensor_updates_in_progress[tensor_name] is None:
+                self.tensor_updates_in_progress[tensor_name] = tensor
+                self.tensor_updates_in_progress_datasizes[tensor_name] = data_size
+            # otherwise, we compute the streaming weighted average
+            else:
+                # get the current update size total
+                total_size = self.tensor_updates_in_progress_datasizes[tensor_name]
+
+                # compute the weights for the global vs local tensors for our streaming average
+                weight_g = total_size / (total_size + data_size)
+                weight_l = data_size / (total_size + data_size)
+
+                # update the streaming average
+                tensors = [self.tensor_updates_in_progress[tensor_name], tensor]
+                self.tensor_updates_in_progress[tensor_name] = np.average(tensors, weights=[weight_g, weight_l], axis=0)
+
+                # update the total size
+                self.tensor_updates_in_progress_datasizes[tensor_name] += data_size
+
+            self.logger.info("Completed tensor update {} from {}".format(tensor_name, collaborator))
+
+            # TODO!!!!! End of round check here is maybe bad...
+        else:
+            self.logger.info("Ingoring tensor update {} from {}".format(tensor_name, collaborator))            
+
+        return LocalTensorUpdateAck(header=self.create_reply_header(message), discard_updates=False)
+
+    @_synchronized
+    def UploadLocalModelUpdate(self, message):
         """Parses the collaborator reply message to get the collaborator model update
 
         Args:
@@ -522,6 +578,9 @@ class Aggregator(object):
 
         return reply
 
+    def collaborator_has_trained(self, collaborator):
+        return collaborator in self.per_col_round_stats["collaborator_training_sizes"]
+
     @_synchronized
     def UploadLocalMetricsUpdate(self, message):
         """Parses the collaborator reply message to get the collaborator metrics (usually the local validation score)
@@ -569,9 +628,6 @@ class Aggregator(object):
         self.logger.debug('aggregator handled UploadLocalMetricsUpdate in time {}'.format(time.time() - t))
 
         return reply
-
-    def collaborator_has_trained(self, collaborator):
-        return collaborator in self.per_col_round_stats["collaborator_training_sizes"]
 
     @_synchronized
     def RequestJob(self, message):
@@ -642,65 +698,59 @@ class Aggregator(object):
         return reply
 
     @_synchronized
-    def DownloadLayer(self, message):
-        """Sends a layer to the collaborator
+    def DownloadModelInfo(self, message):
+        """Sends the model header, tensor names, and metadata to the collaborator
 
         Args:
             message: Message from the collaborator
 
         Returns:
-            The reply to the message (usually just the acknowledgement to the collaborator)
+            The reply to the message (a ModelInfo)
 
         """
-
-        t = time.time()
         self.validate_header(message)
+        self.logger.info("Received DownloadModelInfo request from %s " % message.header.sender)
 
-        self.logger.info("Received layer download request from %s " % message.header.sender)
-
-        # ensure the models don't match
-        if not(self.collaborator_out_of_date(message.model_header)):
-            statement = "Collaborator asking for download when not out of date."
-            self.logger.exception(statement)
-            raise RuntimeError(statement)
-
-        # check whether there is an issue related to the sending of deltas or non-deltas
-        if message.model_header.version == -1:
-            if self.model.header.is_delta:
-                raise RuntimeError('First collaborator model download, and we only have a delta.')
-        elif message.model_header.is_delta != self.model.header.is_delta:
-            raise RuntimeError('Collaborator requesting non-initial download should hold a model with the same is_delta as aggregated model.')
-        elif message.model_header.is_delta and (message.model_header.delta_from_version != self.model.header.delta_from_version):
-            # TODO: In the future we could send non-delta model here to restore base model.
-            raise NotImplementedError('Base of download model delta does not match current collaborator base, and aggregator restoration of base model not implemented.')
-
-        # determine the next tensor to send
-        layers_remaining = np.setdiff1d(self.layers_in_model, messages.layers_already_downloaded)
-        if layers_remaining.size == 0:
-            raise RuntimeError("Erroneous layer request. Collaborator already has all layers!")
-
-        for t in self.model.tensors:
-            if t.name == layers_remaining[0]
-                tensor_to_send = t
-                break
-        
-        if tensor_to_send is None:
-            raise RuntimeError("{} not found in model!".format(layers_remaining[0]))
-
-        # we only send metadata with the first layer
         metadata_yaml = None
-        if self.send_metadata_to_clients and len(layers_already_downloaded) == 0:
+        if self.send_metadata_to_clients:
             metadata_yaml = yaml.dump(self.metadata)
 
-        is_last_layer = layers_remaining.size == 1
+        reply = ModelInfo(header=self.create_reply_header(message),
+                          model_header=self.model.header,
+                          tensor_names=self.model_tensor_names,
+                          is_global_best=self.aggregated_model_is_global_best,
+                          metadata_yaml=metadata_yaml)
 
-        reply = GlobalLayerUpdate(header=self.create_reply_header(message),
-                                  layer=LayerProto(header=self.model.header, tensor=tensor_to_send),
-                                  is_global_best=self.aggregated_model_is_global_best,
-                                  metadata_yaml=metadata_yaml,
-                                  is_last_layer=is_last_layer)
+        self.logger.debug("Completed preparing DownloadModelInfo reply for %s. Sending." % message.header.sender)
 
-        self.logger.debug('aggregator handled DownloadLayer in time {}'.format(time.time() - t))
+        return reply
+
+
+    @_synchronized
+    def DownloadGlobalTensor(self, message):
+        """Sends a tensor to the collaborator
+
+        Args:
+            message: Message from the collaborator
+
+        Returns:
+            A GlobalTensorUpdate
+
+        """
+        self.validate_header(message)
+        self.logger.info("Received DownloadGlobalTensor request from %s " % message.header.sender)
+
+        if message.tensor_name not in self.model_tensors:
+            raise RuntimeError("Requested tensor {} from {} not in our list of tensors!".format(message.tensor_name, message.header.sender))
+
+        tensor_proto = numpy_array_to_tensor_proto(self.model_tensors[message.tensor_name],
+                                                   message.tensor_name)
+
+        reply = GlobalTensorUpdate(header=self.create_reply_header(message),
+                                   model_header=self.model_header,
+                                   tensor=tensor_proto)
+
+        self.logger.debug("Completed preparing GlobalTensorUpdate reply for %s. Sending." % message.header.sender)
 
         return reply
 

@@ -20,10 +20,10 @@ package openfl_proto;
 
 service Aggregator {
     rpc RequestJob(JobRequest) returns (JobReply) {}
-    rpc DownloadLayer(LayerDownloadRequest) returns (stream DataStream) {}
-    // rpc UploadLocalModelUpdate(stream DataStream) returns (LocalModelUpdateAck) {}
+    rpc DownloadGlobalTensor(GlobalTensorDownloadRequest) returns (stream DataStream) {}
+    rpc DownloadModelInfo(ModelInfoRequest) returns (ModelInfo) {}
     rpc UploadLocalLossResults(LocalLossResults) returns (LocalLossResultsAck) {}
-    rpc UploadLocalLayerUpdate(stream DataStream) returns (LocalLayerUpdateAck) {}
+    rpc UploadLocalTensorUpdate(stream DataStream) returns (LocalTensorUpdateAck) {}
     rpc UploadLocalMetricsUpdate(LocalValidationResults) returns (LocalValidationResultsAck) {}
 }
 
@@ -50,8 +50,8 @@ message MetadataProto {
 
 message TensorProto {
     string name = 1;
-    bytes data_bytes = 3; 
-    repeated MetadataProto transformer_metadata = 4;
+    bytes data_bytes = 2;
+    repeated int32 shape = 3;
 }
 
 // Everything but 'sender' is effectively just for sanity checking during testing
@@ -66,10 +66,7 @@ message MessageHeader {
 
 message ModelHeader {
     string id = 1;
-    bool is_delta = 2;
-    int32 delta_from_version = 3;
-    // FIXME: is this version or rounds trained? We need to know rounds trained somewhere, and this currently does track that
-    int32 version = 4;
+    int32 version = 2;
 }
 
 message ModelProto {
@@ -77,22 +74,16 @@ message ModelProto {
     repeated TensorProto tensors = 2;
 }
 
-message LayerProto {
-    ModelHeader header = 1;
-    TensorProto tensor = 2;
-}
-
-
 // COLLABORATOR MESSAGES
 
-// message LocalModelUpdate {
-//     MessageHeader header = 1;
-//     ModelProto model = 2;
-//     int32 data_size = 3;
-//     // map<string, float> loss = 4;
-//     float loss = 4;
-// }
+message GlobalTensorDownloadRequest {
+    MessageHeader header = 1;
+    string tensor_name = 2;
+}
 
+message ModelInfoRequest {
+    MessageHeader header = 1;
+}
 
 message LocalLossResults {
     MessageHeader header = 1;
@@ -101,10 +92,11 @@ message LocalLossResults {
     int32 data_size = 4;
 }
 
-
-message LocalLayerUpdate {
+message LocalTensorUpdate {
     MessageHeader header = 1;
-    LayerProto model = 2;
+    ModelHeader model_header = 2;
+    TensorProto tensor = 3;
+    int32 data_size = 4;
 }
 
 message LocalValidationResults {
@@ -118,12 +110,6 @@ message LocalValidationResults {
 message JobRequest {
     MessageHeader header = 1;
     ModelHeader model_header = 2;
-}
-
-message LayerDownloadRequest {
-    MessageHeader header = 1;
-    ModelHeader model_header = 2;
-    repeated string layers_already_downloaded = 3;
 }
 
 message RoundTaskQuery {
@@ -140,12 +126,10 @@ message RoundTaskQuery {
 //     string metadata_yaml = 4;
 // }
 
-message GlobalLayerUpdate {
+message GlobalTensorUpdate {
     MessageHeader header = 1;
-    LayerProto layer = 2;
-    bool is_global_best = 3;
-    string metadata_yaml = 4;
-    bool is_last_layer = 5;
+    ModelHeader model_header = 2;
+    TensorProto tensor = 3;
 }
 
 message JobReply {
@@ -154,8 +138,9 @@ message JobReply {
     string extra = 3;
 }
 
-message LocalLayerUpdateAck {
+message LocalTensorUpdateAck {
     MessageHeader header = 1;
+    bool discard_updates = 2;
 }
 
 message LocalValidationResultsAck {
@@ -164,4 +149,12 @@ message LocalValidationResultsAck {
 
 message LocalLossResultsAck {
     MessageHeader header = 1;
+}
+
+message ModelInfo {
+    MessageHeader header = 1;
+    ModelHeader model_header = 2;
+    repeated string tensor_names = 3;
+    bool is_global_best = 4;
+    string metadata_yaml = 5;
 }

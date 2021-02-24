@@ -318,9 +318,6 @@ class Collaborator(object):
         This is the code that actual runs the model training on the collaborator.
 
         """
-        # get the initial tensor dict
-        # initial_tensor_dict = self.wrapped_model.get_tensor_dict()
-
         # get the training data size
         data_size = self.wrapped_model.get_training_data_size()
 
@@ -347,37 +344,29 @@ class Collaborator(object):
         # get the trained tensor dict and store any designated to be held out from aggregation
         shared_tensors = self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
 
-        # create the model proto
-        if self.send_model_deltas:
-            deltas = self.create_deltas(tensor_dict=shared_tensors)
-            model_proto = construct_proto(tensor_dict=deltas["tensor_dict"],
-                                          model_id=self.model_header.id,
-                                          model_version=self.model_header.version,
-                                          compression_pipeline=self.compression_pipeline,
-                                          is_delta=True,
-                                          delta_from_version=deltas["delta_from_version"])
-        else:
-            model_proto = construct_proto(tensor_dict=shared_tensors,
-                                          model_id=self.model_header.id,
-                                          model_version=self.model_header.version,
-                                          compression_pipeline=self.compression_pipeline,
-                                          is_delta=False,
-                                          delta_from_version=-1)
+        # send each tensor individually
+        for name, tensor in shared_tensors:
+            tensor_proto = numpy_array_to_tensor_proto(tensor, name)
+            request = LocalTensorUpdate(header=self.create_message_header(),
+                                        model_header=self.model_header,
+                                        tensor=tensor_proto,
+                                        data_size=data_size)
+            try:
+                reply = self.channel.UploadLocalModelUpdate(request)
+            except Exception as e:
+                self.logger.exception(repr(e))
+                self.logger.warning("Retrying upload of tensor {}".format(name))
+                reply = self.channel.UploadLocalModelUpdate(request)
 
-        self.logger.debug("{} - Sending the model to the aggregator.".format(self))
+            self.validate_header(reply)
+            check_type(reply, LocalTensorUpdateAck, self.logger)
+            self.logger.info("{} - sent to {} aggregator".format(self, name))
 
-        # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
-        # an exception can happen in cases where we simply need to retry
-        try:
-            reply = self.channel.UploadLocalModelUpdate(LocalModelUpdate(header=self.create_message_header(), model=model_proto, data_size=data_size, loss=loss))
-        except Exception as e:
-            self.logger.exception(repr(e))
-            self.logger.warning("Retrying upload of model")
-            reply = self.channel.UploadLocalModelUpdate(LocalModelUpdate(header=self.create_message_header(), model=model_proto, data_size=data_size, loss=loss))
+            if reply.discard_updates:
+                self.logger.info("Aggregator discarding update. Canceling send.")
+                return
 
-        self.validate_header(reply)
-        check_type(reply, LocalModelUpdateAck, self.logger)
-        self.logger.info("{} - Model update succesfully sent to aggregator".format(self))
+        self.logger.info("{} - Train job complete".format(self))
 
     def do_validate_job(self):
         """Validate the model (locally)
@@ -406,65 +395,38 @@ class Collaborator(object):
         # time the download
         download_start = time.time()
 
-        # download each layer
-        tensors_downloaded = []
-        request = LayerDownloadRequest(header=self.create_message_header(),
-                                       model_header=self.model_header),
-                                       layers_already_downloaded=[])
-        # if we get a header for a more recent model, we need to reset our layers already downloaded
-        model_header = None
-        metadata_yaml = None
-        is_global_best = False
-        while True:
-            request.layers_already_downloaded = [t.name for t in tensors_downloaded]
-            # sanity check on version is implicit in send
-            # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
-            # an exception can happen in cases where we simply need to retry
-            try:
-                reply = self.channel.DownloadLayer(request)
-            except Exception as e:
-                self.logger.exception(repr(e))
-                self.logger.warning("Retrying download of next layer")
-                reply = self.channel.DownloadLayer(request)
-            
+        # get the tensor names
+        model_info = self.channel.DownloadModelInfo(ModelInfoRequest(header=self.create_message_header()))
+
+        # ensure we are actually downloading a new model version
+        check_not_equal(model_info.model_header.version, self.model_header.version, self.logger)
+
+        # validation of reply
+        check_type(model_info, ModelInfo, self.logger)
+        self.validate_header(model_info)        
+
+        # download each tensor into our dictionary
+        agg_tensor_dict = {}
+        for t in reply.tensor_names:
+            request = GlobalTensorDownloadRequest(header=self.create_message_header(), tensor_name=t)
+            tensor_update = self.channel.DownloadGlobalTensor(request)
+
             # validation of reply
-            check_type(reply, GlobalLayerUpdate, self.logger)
+            check_type(tensor_update, GlobalTensorUpdate, self.logger)
             self.validate_header(reply)
 
-            # if newer version than previous layer, reset layers_already_downloaded
-            if model_header is None or reply.layer.header.version > model_header.version:
-                model_header = reply.layer.header
-                tensors_downloaded = [reply.layer.tensor]
-            # otherwise, append to our list and check if we can break
-            else:
-                tensors_downloaded.append(reply.layer.tensor)
-                if reply.is_last_layer:
-                    # set the metadata and global best values
-                    metadata_yaml = reply.metadata_yaml
-                    is_global_best = reply.is_global_best
-                    break
-
+            # if the version has changed from when we got the model info, we need to exit and get a new job
+            if tensor_update.model_header.version > model_info.model_header.version:
+                self.logger.info("{} canceling download model job, as model appears to have updated".format(self))
+                return
+            
+            # version is consistent, so we can proceed
+            agg_tensor_dict[t] = tensor_proto_to_numpy_array(tensor_update.tensor)
+        
         self.logger.info("{} took {} seconds to download the model".format(self, round(time.time() - download_start, 3)))
-        self.logger.info("{} - Completed the model downloading job.".format(self))
-
-        # ensure we actually got a new model version
-        check_not_equal(model_header.version, self.model_header.version, self.logger)
-
+        
         # set our model header
-        self.model_header = model_header
-
-        # compute the aggregated tensors dict from the model proto
-        agg_tensor_dict = deconstruct_proto(model_proto=received_model_proto, compression_pipeline=self.compression_pipeline)
-
-        # TODO: If updating of base is not done every round, we will no longer be able to use the base to get
-        #       the current global values of the shared tensors.
-        if self.send_model_deltas:
-            self.update_base_for_deltas(tensor_dict=agg_tensor_dict,
-                                        delta_from_version=received_model_delta_from_version,
-                                        version=received_model_version,
-                                        is_delta=received_model_is_delta)
-            # base_for_deltas can provide the global shared tensor values here
-            agg_tensor_dict = self.base_for_deltas["tensor_dict"]
+        self.model_header = model_info.model_header
 
         # restore any tensors held out from aggregation
         tensor_dict = {**agg_tensor_dict, **self.holdout_tensors}
@@ -476,7 +438,7 @@ class Collaborator(object):
 
         # Ensuring proper initialization regardless of model state. Initial global models
         # do not contain optimizer state, and so cannot be used to reset the optimizer params.
-        if reply.model.header.version == 0:
+        if model_info.model.header.version == 0:
             with_opt_vars = False
             self.wrapped_model.reset_opt_vars()
 
@@ -484,14 +446,14 @@ class Collaborator(object):
         self.logger.debug("Loaded the model.")
 
         # if we are supposed to save the best model and the model is the best, we save it
-        if reply.is_global_best and self.save_best_native_path:
+        if model_info.is_global_best and self.save_best_native_path:
             self.wrapped_model.save_native(self.save_best_native_path, self.save_best_native_kwargs)
             self.logger.info("Saving best model to {}".format(self.save_best_native_path))
 
         # if we should save metadata and have meta in protobuf
-        if self.save_metadata_path is not None and reply.metadata_yaml is not None:
+        if self.save_metadata_path is not None and model_info.metadata_yaml is not None:
             with open(self.save_metadata_path, 'w') as f:
-                f.write(reply.metadata_yaml)
+                f.write(model_info.metadata_yaml)
                 self.logger.info("Wrote metadata to {}".format(self.save_metadata_path))
 
         # FIXME: for the CONTINUE_LOCAL treatment, we need to store the status in case of a crash.
