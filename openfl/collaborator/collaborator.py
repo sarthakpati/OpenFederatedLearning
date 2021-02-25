@@ -444,7 +444,7 @@ class Collaborator(object):
         check_type(reply, GlobalModelUpdate, self.logger)
 
         # check if our version has been reverted, possibly due to an aggregator reset
-        version_reverted = self.model_header > received_model_proto.header
+        version_reverted = self.model_header.version > received_model_proto.header.version
 
         # set our model header
         self.model_header = received_model_proto.header
