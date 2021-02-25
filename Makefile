@@ -110,7 +110,7 @@ $(openfl_tensorflow): $(openfl_tensorflow_whl)
 	venv/bin/pip install $(openfl_tensorflow_whl)
 
 $(fets): $(fets_whl) $(gandlf_whl)
-        venv/bin/pip install opencv-python==4.2.0.34
+	venv/bin/pip install opencv-python==4.2.0.34
 	venv/bin/pip install $(fets_whl)
 	venv/bin/pip install $(gandlf_whl) 
 	
