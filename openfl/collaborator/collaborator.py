@@ -436,7 +436,6 @@ class Collaborator(object):
         received_model_is_delta = received_model_proto.header.is_delta
         received_model_delta_from_version = received_model_proto.header.delta_from_version
 
-
         self.logger.info("{} took {} seconds to download the model".format(self, round(time.time() - download_start, 3)))
 
         self.validate_header(reply)
@@ -444,8 +443,8 @@ class Collaborator(object):
 
         check_type(reply, GlobalModelUpdate, self.logger)
 
-        # ensure we actually got a new model version
-        check_not_equal(received_model_version, self.model_header.version, self.logger)
+        # check if our version has been reverted, possibly due to an aggregator reset
+        version_reverted = self.model_header > received_model_proto.header
 
         # set our model header
         self.model_header = received_model_proto.header
@@ -473,8 +472,12 @@ class Collaborator(object):
 
         # Ensuring proper initialization regardless of model state. Initial global models
         # do not contain optimizer state, and so cannot be used to reset the optimizer params.
-        if reply.model.header.version == 0:
+        # Additionally, in any mode other than continue global, if we received an older model, we need to
+        # reset our optimizer parameters
+        if reply.model.header.version == 0 or \
+           (self.opt_treatment != OptTreatment.CONTINUE_GLOBAL and version_reverted):
             with_opt_vars = False
+            self.logger.info("Resetting optimizer vars")
             self.wrapped_model.reset_opt_vars()
 
         self.wrapped_model.set_tensor_dict(tensor_dict, with_opt_vars=with_opt_vars)
