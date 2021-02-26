@@ -46,7 +46,7 @@ class AggregatorGRPCServer(AggregatorServicer):
             ValueError: If the collaborator or collaborator certificate is not valid then raises error.
 
         """
-        if not self.disable_tls:
+        if not self.disable_tls and not self.disable_client_auth:
             common_name = context.auth_context()['x509_common_name'][0].decode("utf-8")
             collaborator_common_name = request.header.sender
             if not self.aggregator.valid_collaborator_CN_and_id(common_name, collaborator_common_name):
@@ -129,6 +129,7 @@ class AggregatorGRPCServer(AggregatorServicer):
         uri = "[::]:{port:d}".format(port=agg_port)
         self.disable_tls = disable_tls
         self.logger = logger
+        self.disable_client_auth = disable_client_auth
 
         if disable_tls:
             logger.warn('gRPC is running on insecure channel with TLS disabled.')
