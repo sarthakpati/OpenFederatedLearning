@@ -100,7 +100,8 @@ def main(plan,
         sys.exit(0)
     except Exception as e:
         logging.getLogger(__name__).exception(repr(e))
-        sys.exit(1)
+        # this is for Sarthak
+        sys.exit(666)
 
 
 if __name__ == '__main__':
