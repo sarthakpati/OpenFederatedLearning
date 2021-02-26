@@ -27,7 +27,8 @@ def main(plan,
          logging_config_path, 
          logging_default_level, 
          logging_directory,
-         resume):
+         resume,
+         script_dir):
     """Runs the aggregator service from the Federation (FL) plan
 
     Args:
@@ -37,10 +38,11 @@ def main(plan,
         logging_config_path: The log configuration file
         logging_default_level: The log level
         resume: Whether the aggregator should load the latest model instead of the initial model
-
+        script_dir: default None uses the script dir. Otherwise, use the directory passed as the script dir
     """
     # FIXME: consistent filesystem (#15)
-    script_dir = os.path.dirname(os.path.realpath(__file__))
+    if script_dir is None:
+        script_dir = os.path.dirname(os.path.realpath(__file__))
     base_dir = os.path.join(script_dir, 'federations')
     plan_dir = os.path.join(base_dir, 'plans')
     weights_dir = os.path.join(base_dir, 'weights')
@@ -75,5 +77,6 @@ if __name__ == '__main__':
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
     parser.add_argument('--resume', '-r', type=bool, default=False)
+    parser.add_argument('--script_dir', '-sd', type=str, default=None)
     args = parser.parse_args()
     main(**vars(args))
