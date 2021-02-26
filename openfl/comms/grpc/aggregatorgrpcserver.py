@@ -155,7 +155,7 @@ class AggregatorGRPCServer(AggregatorServicer):
         logger.info('Starting aggregator.')
         server.start()
         try:
-            while not self.aggregator.all_quit_jobs_sent():
+            while not self.aggregator.time_to_quit():
                 time.sleep(5)
         except KeyboardInterrupt:
             pass
