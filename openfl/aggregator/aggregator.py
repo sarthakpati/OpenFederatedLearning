@@ -112,6 +112,9 @@ class Aggregator(object):
 
         self.round_num = self.model.header.version + 1
 
+        self._GRACEFULLY_QUIT = False
+        self._do_quit = False
+
         self.model_update_in_progress = None
 
         self.init_per_col_round_stats()
@@ -155,7 +158,10 @@ class Aggregator(object):
             return
 
         for k, v in config.items():
-            if k not in self.runtime_configurable_params:
+            if k == '_GRACEFULLY_QUIT':
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
+            elif k not in self.runtime_configurable_params:
                 self.logger.warning("Aggregator config file contains {}. This is not allowed by the flplan.".format(k))
             elif not hasattr(self, k):
                 self.logger.warning("Aggregator config file contains {}. This is not a valid aggregator parameter".format(k))
@@ -210,6 +216,9 @@ class Aggregator(object):
         # otherwise, common_name must be in whitelist and collaborator_common_name must be in collaborator_common_names
         else:
             return cert_common_name == self.single_col_cert_common_name and collaborator_common_name in self.collaborator_common_names
+
+    def time_to_quit(self):
+        return self._do_quit or self.all_quit_jobs_sent()
 
     def all_quit_jobs_sent(self):
         """Determines if all collaborators have been sent the QUIT command.
@@ -422,6 +431,8 @@ class Aggregator(object):
         self.logger.debug("Start a new round %d." % self.round_num)
         self.round_start_time = None
 
+        self._do_quit = self._GRACEFULLY_QUIT
+
 
     def UploadLocalModelUpdate(self, message):
         """Parses the collaborator reply message to get the collaborator model update
@@ -446,9 +457,10 @@ class Aggregator(object):
             is_delta = message.model.header.is_delta
             delta_from_version = message.model.header.delta_from_version
 
-            # validate this model header
-            check_equal(message.model.header.id, self.model.header.id, self.logger)
-            check_equal(message.model.header.version, self.model.header.version, self.logger)
+            # if collaborator out of sync, we need to log and ignore
+            if self.collaborator_out_of_sync(message.model.header):
+                self.logger.info("Model version mismatch in UploadLocalModelUpdate from {}. Aggregator version: {} Collaborator version: {}. Ignoring update".format(message.header.sender, self.model.header.version, message.model.header.version))
+                return LocalModelUpdateAck(header=self.create_reply_header(message))
 
             # ensure we haven't received an update from this collaborator already
             check_not_in(message.header.sender, self.per_col_round_stats["loss_results"], self.logger)
@@ -531,12 +543,12 @@ class Aggregator(object):
 
             self.logger.debug("Receive local validation results from %s " % message.header.sender)
             model_header = message.model_header
-
-            # validate this model header
-            check_equal(model_header.id, self.model.header.id, self.logger)
-            check_equal(model_header.version, self.model.header.version, self.logger)
-
             sender = message.header.sender
+
+            # if collaborator out of sync, we need to log and ignore
+            if self.collaborator_out_of_sync(message.model_header):
+                self.logger.info("Model version mismatch in UploadLocalMetricsUpdate from {}. Aggregator version: {} Collaborator version: {}. Ignoring update".format(message.header.sender, self.model.header.version, model_header.version))
+                return LocalValidationResultsAck(header=self.create_reply_header(message))
 
             if sender not in self.per_col_round_stats["agg_validation_results"]:
                 # Pre-train validation
@@ -591,7 +603,7 @@ class Aggregator(object):
         # FIXME: this flow needs to depend on a job selection output for the round
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
-        elif self.collaborator_out_of_date(message.model_header):
+        elif self.collaborator_out_of_sync(message.model_header):
             job = JOB_DOWNLOAD_MODEL
         # else, check if this collaborator has not sent validation results
         elif message.header.sender not in self.per_col_round_stats["agg_validation_results"]:
@@ -645,12 +657,6 @@ class Aggregator(object):
 
         self.logger.info("Received model download request from %s " % message.header.sender)
 
-        # ensure the models don't match
-        if not(self.collaborator_out_of_date(message.model_header)):
-            statement = "Collaborator asking for download when not out of date."
-            self.logger.exception(statement)
-            raise RuntimeError(statement)
-
         # check whether there is an issue related to the sending of deltas or non-deltas
         if message.model_header.version == -1:
             if self.model.header.is_delta:
@@ -683,8 +689,8 @@ class Aggregator(object):
         """
         return MessageHeader(sender=self.uuid, recipient=message.header.sender, federation_id=self.federation_uuid, counter=message.header.counter, single_col_cert_common_name=self.single_col_cert_common_name)
 
-    def collaborator_out_of_date(self, model_header):
-        """Determines if the collaborator has the wrong version of the model (aka out of date)
+    def collaborator_out_of_sync(self, model_header):
+        """Determines if the collaborator has the wrong version of the model (aka out of sync)
 
         Args:
             model_header: Header for the model
