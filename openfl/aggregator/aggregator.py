@@ -650,9 +650,15 @@ class Aggregator(object):
         # get the collaborator who sent this message
         collaborator = message.header.sender
 
+        if 
+            job = JOB_QUIT
+            if collaborator not in self.quit_job_sent_to:
+                self.quit_job_sent_to.append(collaborator)
+        
+
         # FIXME: we should really have each collaborator validate one last time
         # check if we are done
-        if self.round_num > self.rounds_to_train:
+        if self.collaborators_should_quit():
             job = JOB_QUIT
 
             # we may need to send this again if the collaborator process has been restarted for some reason
@@ -753,6 +759,9 @@ class Aggregator(object):
         self.logger.debug("Completed preparing GlobalTensorUpdate reply for %s. Sending." % message.header.sender)
 
         return reply
+
+    def collaborators_should_quit(self):
+        return self.round_num > self.rounds_to_train
 
     def create_reply_header(self, message):
         """Creates a header for the reply to the message
