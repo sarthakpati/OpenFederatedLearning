@@ -16,7 +16,7 @@ import logging
 import numpy as np
 
 from .. import check_type, check_equal, check_not_equal, split_tensor_dict_for_holdouts
-from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader
+from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ValueDictionary
 from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply
 from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
 from ..proto.collaborator_aggregator_interface_pb2 import ModelHeader, TensorProto, TensorDownloadRequest, ResultsUpload
