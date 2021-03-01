@@ -364,7 +364,7 @@ class Aggregator(object):
             if message.WhichOneof("extra") == 'tensor':
                 value = tensor_proto_to_numpy_array(message.tensor)
             elif message.WhichOneof("extra") == 'value_dict':
-                value = message.value_dict.dictionary
+                value = dict(message.value_dict.dictionary)
             else:
                 value = message.value
 

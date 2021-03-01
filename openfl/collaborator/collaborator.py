@@ -316,11 +316,14 @@ class Collaborator(object):
         else:
             batches_per_epoch = int(np.ceil(data_size/self.wrapped_model.data.batch_size))
             num_batches = int(np.floor(batches_per_epoch * self.epochs_per_round))
+
+        self.logger.debug("{} Begun training {} batches.".format(self, num_batches))
+
         train_info = self.wrapped_model.train_batches(num_batches=num_batches)
 
         self.local_model_has_been_trained = True
 
-        self.logger.debug("{} Completed the training job for {} batches.".format(self, num_batches))
+        self.logger.debug("{} Completed training {} batches.".format(self, num_batches))
 
         # allowing extra information regarding training to be logged (for now none of the extra info is sent to the aggregator)
         if isinstance(train_info, dict):
@@ -338,7 +341,7 @@ class Collaborator(object):
         for k, v in shared_tensors.items():
             self.round_results[k] = (v, data_size)
 
-        self.logger.info("{} - Train job complete".format(self))
+        self.logger.info("{} - Training complete".format(self))
 
     def do_validation_task(self, result_name):
         """Validate the model (locally)
