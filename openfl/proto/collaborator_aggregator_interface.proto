@@ -109,3 +109,30 @@ message ResultsAck {
     MessageHeader header = 1;
     bool discard_round = 2;
 }
+
+/// LEGACY PBUF DEFINITIONS TO USE WITH CONVERSION UTILTIES
+
+message LegacyTensorProto {
+    string name = 1;
+    bytes data_bytes = 3; 
+    repeated LegacyMetadataProto transformer_metadata = 4;
+}
+
+message LegacyModelHeader {
+    string id = 1;
+    bool is_delta = 2;
+    int32 delta_from_version = 3;
+    // FIXME: is this version or rounds trained? We need to know rounds trained somewhere, and this currently does track that
+    int32 version = 4;
+}
+
+message LegacyModelProto {
+    LegacyModelHeader header = 1;
+    repeated LegacyTensorProto tensors = 2;   
+}
+
+message LegacyMetadataProto {
+    map<int32, float> int_to_float = 1;
+    repeated int32 int_list = 2;
+    repeated bool bool_list = 3;
+}

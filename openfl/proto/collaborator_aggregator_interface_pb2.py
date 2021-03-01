@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='openfl_proto',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=b'\n\'collaborator_aggregator_interface.proto\x12\x0copenfl_proto\"+\n\nDataStream\x12\x0c\n\x04size\x18\x01 \x01(\r\x12\x0f\n\x07npbytes\x18\x02 \x01(\x0c\">\n\x0bTensorProto\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x12\n\ndata_bytes\x18\x02 \x01(\x0c\x12\r\n\x05shape\x18\x03 \x03(\x05\"*\n\x0bModelHeader\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x05\"\xb0\x01\n\rMessageHeader\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x11\n\trecipient\x18\x02 \x01(\t\x12\x15\n\rfederation_id\x18\x03 \x01(\t\x12/\n\x0cmodel_header\x18\x04 \x01(\x0b\x32\x19.openfl_proto.ModelHeader\x12\x0f\n\x07\x63ounter\x18\x05 \x01(\x05\x12#\n\x1bsingle_col_cert_common_name\x18\x06 \x01(\t\"&\n\x0e\x45xtraModelInfo\x12\x14\n\x0ctensor_names\x18\x01 \x03(\t\"\x87\x01\n\x0fValueDictionary\x12\x41\n\ndictionary\x18\x01 \x03(\x0b\x32-.openfl_proto.ValueDictionary.DictionaryEntry\x1a\x31\n\x0f\x44ictionaryEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01\"Y\n\x15TensorDownloadRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x13\n\x0btensor_name\x18\x02 \x01(\t\"\xd6\x01\n\rResultsUpload\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x0e\n\x06weight\x18\x02 \x01(\x05\x12\x0c\n\x04task\x18\x03 \x01(\t\x12+\n\x06tensor\x18\x04 \x01(\x0b\x32\x19.openfl_proto.TensorProtoH\x00\x12\x0f\n\x05value\x18\x05 \x01(\x02H\x00\x12\x33\n\nvalue_dict\x18\x06 \x01(\x0b\x32\x1d.openfl_proto.ValueDictionaryH\x00\x42\x07\n\x05\x65xtra\"9\n\nJobRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\"f\n\x0cGlobalTensor\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12)\n\x06tensor\x18\x02 \x01(\x0b\x32\x19.openfl_proto.TensorProto\"\xbd\x01\n\x08JobReply\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x1e\n\x03job\x18\x02 \x01(\x0e\x32\x11.openfl_proto.Job\x12\x38\n\x10\x65xtra_model_info\x18\x03 \x01(\x0b\x32\x1c.openfl_proto.ExtraModelInfoH\x00\x12\x0e\n\x04name\x18\x04 \x01(\tH\x00\x12\x11\n\x07seconds\x18\x05 \x01(\x05H\x00\x42\x07\n\x05\x65xtra\"P\n\nResultsAck\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x15\n\rdiscard_round\x18\x02 \x01(\x08*R\n\x03Job\x12\x16\n\x12JOB_DOWNLOAD_MODEL\x10\x00\x12\x16\n\x12JOB_UPLOAD_RESULTS\x10\x01\x12\r\n\tJOB_SLEEP\x10\x02\x12\x0c\n\x08JOB_QUIT\x10\x03\x32\xec\x01\n\nAggregator\x12@\n\nRequestJob\x12\x18.openfl_proto.JobRequest\x1a\x16.openfl_proto.JobReply\"\x00\x12S\n\x0e\x44ownloadTensor\x12#.openfl_proto.TensorDownloadRequest\x1a\x18.openfl_proto.DataStream\"\x00\x30\x01\x12G\n\rUploadResults\x12\x18.openfl_proto.DataStream\x1a\x18.openfl_proto.ResultsAck\"\x00(\x01\x62\x06proto3'
+  serialized_pb=b'\n\'collaborator_aggregator_interface.proto\x12\x0copenfl_proto\"+\n\nDataStream\x12\x0c\n\x04size\x18\x01 \x01(\r\x12\x0f\n\x07npbytes\x18\x02 \x01(\x0c\">\n\x0bTensorProto\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x12\n\ndata_bytes\x18\x02 \x01(\x0c\x12\r\n\x05shape\x18\x03 \x03(\x05\"*\n\x0bModelHeader\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x05\"\xb0\x01\n\rMessageHeader\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x11\n\trecipient\x18\x02 \x01(\t\x12\x15\n\rfederation_id\x18\x03 \x01(\t\x12/\n\x0cmodel_header\x18\x04 \x01(\x0b\x32\x19.openfl_proto.ModelHeader\x12\x0f\n\x07\x63ounter\x18\x05 \x01(\x05\x12#\n\x1bsingle_col_cert_common_name\x18\x06 \x01(\t\"&\n\x0e\x45xtraModelInfo\x12\x14\n\x0ctensor_names\x18\x01 \x03(\t\"\x87\x01\n\x0fValueDictionary\x12\x41\n\ndictionary\x18\x01 \x03(\x0b\x32-.openfl_proto.ValueDictionary.DictionaryEntry\x1a\x31\n\x0f\x44ictionaryEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01\"Y\n\x15TensorDownloadRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x13\n\x0btensor_name\x18\x02 \x01(\t\"\xd6\x01\n\rResultsUpload\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x0e\n\x06weight\x18\x02 \x01(\x05\x12\x0c\n\x04task\x18\x03 \x01(\t\x12+\n\x06tensor\x18\x04 \x01(\x0b\x32\x19.openfl_proto.TensorProtoH\x00\x12\x0f\n\x05value\x18\x05 \x01(\x02H\x00\x12\x33\n\nvalue_dict\x18\x06 \x01(\x0b\x32\x1d.openfl_proto.ValueDictionaryH\x00\x42\x07\n\x05\x65xtra\"9\n\nJobRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\"f\n\x0cGlobalTensor\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12)\n\x06tensor\x18\x02 \x01(\x0b\x32\x19.openfl_proto.TensorProto\"\xbd\x01\n\x08JobReply\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x1e\n\x03job\x18\x02 \x01(\x0e\x32\x11.openfl_proto.Job\x12\x38\n\x10\x65xtra_model_info\x18\x03 \x01(\x0b\x32\x1c.openfl_proto.ExtraModelInfoH\x00\x12\x0e\n\x04name\x18\x04 \x01(\tH\x00\x12\x11\n\x07seconds\x18\x05 \x01(\x05H\x00\x42\x07\n\x05\x65xtra\"P\n\nResultsAck\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x15\n\rdiscard_round\x18\x02 \x01(\x08\"v\n\x11LegacyTensorProto\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x12\n\ndata_bytes\x18\x03 \x01(\x0c\x12?\n\x14transformer_metadata\x18\x04 \x03(\x0b\x32!.openfl_proto.LegacyMetadataProto\"^\n\x11LegacyModelHeader\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08is_delta\x18\x02 \x01(\x08\x12\x1a\n\x12\x64\x65lta_from_version\x18\x03 \x01(\x05\x12\x0f\n\x07version\x18\x04 \x01(\x05\"u\n\x10LegacyModelProto\x12/\n\x06header\x18\x01 \x01(\x0b\x32\x1f.openfl_proto.LegacyModelHeader\x12\x30\n\x07tensors\x18\x02 \x03(\x0b\x32\x1f.openfl_proto.LegacyTensorProto\"\xb6\x01\n\x13LegacyMetadataProto\x12G\n\x0cint_to_float\x18\x01 \x03(\x0b\x32\x31.openfl_proto.LegacyMetadataProto.IntToFloatEntry\x12\x10\n\x08int_list\x18\x02 \x03(\x05\x12\x11\n\tbool_list\x18\x03 \x03(\x08\x1a\x31\n\x0fIntToFloatEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01*R\n\x03Job\x12\x16\n\x12JOB_DOWNLOAD_MODEL\x10\x00\x12\x16\n\x12JOB_UPLOAD_RESULTS\x10\x01\x12\r\n\tJOB_SLEEP\x10\x02\x12\x0c\n\x08JOB_QUIT\x10\x03\x32\xec\x01\n\nAggregator\x12@\n\nRequestJob\x12\x18.openfl_proto.JobRequest\x1a\x16.openfl_proto.JobReply\"\x00\x12S\n\x0e\x44ownloadTensor\x12#.openfl_proto.TensorDownloadRequest\x1a\x18.openfl_proto.DataStream\"\x00\x30\x01\x12G\n\rUploadResults\x12\x18.openfl_proto.DataStream\x1a\x18.openfl_proto.ResultsAck\"\x00(\x01\x62\x06proto3'
 )
 
 _JOB = _descriptor.EnumDescriptor(
@@ -47,8 +47,8 @@ _JOB = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1312,
-  serialized_end=1394,
+  serialized_start=1832,
+  serialized_end=1914,
 )
 _sym_db.RegisterEnumDescriptor(_JOB)
 
@@ -621,6 +621,223 @@ _RESULTSACK = _descriptor.Descriptor(
   serialized_end=1310,
 )
 
+
+_LEGACYTENSORPROTO = _descriptor.Descriptor(
+  name='LegacyTensorProto',
+  full_name='openfl_proto.LegacyTensorProto',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='openfl_proto.LegacyTensorProto.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='data_bytes', full_name='openfl_proto.LegacyTensorProto.data_bytes', index=1,
+      number=3, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='transformer_metadata', full_name='openfl_proto.LegacyTensorProto.transformer_metadata', index=2,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1312,
+  serialized_end=1430,
+)
+
+
+_LEGACYMODELHEADER = _descriptor.Descriptor(
+  name='LegacyModelHeader',
+  full_name='openfl_proto.LegacyModelHeader',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='id', full_name='openfl_proto.LegacyModelHeader.id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='is_delta', full_name='openfl_proto.LegacyModelHeader.is_delta', index=1,
+      number=2, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='delta_from_version', full_name='openfl_proto.LegacyModelHeader.delta_from_version', index=2,
+      number=3, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='version', full_name='openfl_proto.LegacyModelHeader.version', index=3,
+      number=4, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1432,
+  serialized_end=1526,
+)
+
+
+_LEGACYMODELPROTO = _descriptor.Descriptor(
+  name='LegacyModelProto',
+  full_name='openfl_proto.LegacyModelProto',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='header', full_name='openfl_proto.LegacyModelProto.header', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='tensors', full_name='openfl_proto.LegacyModelProto.tensors', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1528,
+  serialized_end=1645,
+)
+
+
+_LEGACYMETADATAPROTO_INTTOFLOATENTRY = _descriptor.Descriptor(
+  name='IntToFloatEntry',
+  full_name='openfl_proto.LegacyMetadataProto.IntToFloatEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='openfl_proto.LegacyMetadataProto.IntToFloatEntry.key', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='openfl_proto.LegacyMetadataProto.IntToFloatEntry.value', index=1,
+      number=2, type=2, cpp_type=6, label=1,
+      has_default_value=False, default_value=float(0),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=b'8\001',
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1781,
+  serialized_end=1830,
+)
+
+_LEGACYMETADATAPROTO = _descriptor.Descriptor(
+  name='LegacyMetadataProto',
+  full_name='openfl_proto.LegacyMetadataProto',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='int_to_float', full_name='openfl_proto.LegacyMetadataProto.int_to_float', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='int_list', full_name='openfl_proto.LegacyMetadataProto.int_list', index=1,
+      number=2, type=5, cpp_type=1, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='bool_list', full_name='openfl_proto.LegacyMetadataProto.bool_list', index=2,
+      number=3, type=8, cpp_type=7, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[_LEGACYMETADATAPROTO_INTTOFLOATENTRY, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1648,
+  serialized_end=1830,
+)
+
 _MESSAGEHEADER.fields_by_name['model_header'].message_type = _MODELHEADER
 _VALUEDICTIONARY_DICTIONARYENTRY.containing_type = _VALUEDICTIONARY
 _VALUEDICTIONARY.fields_by_name['dictionary'].message_type = _VALUEDICTIONARY_DICTIONARYENTRY
@@ -653,6 +870,11 @@ _JOBREPLY.oneofs_by_name['extra'].fields.append(
   _JOBREPLY.fields_by_name['seconds'])
 _JOBREPLY.fields_by_name['seconds'].containing_oneof = _JOBREPLY.oneofs_by_name['extra']
 _RESULTSACK.fields_by_name['header'].message_type = _MESSAGEHEADER
+_LEGACYTENSORPROTO.fields_by_name['transformer_metadata'].message_type = _LEGACYMETADATAPROTO
+_LEGACYMODELPROTO.fields_by_name['header'].message_type = _LEGACYMODELHEADER
+_LEGACYMODELPROTO.fields_by_name['tensors'].message_type = _LEGACYTENSORPROTO
+_LEGACYMETADATAPROTO_INTTOFLOATENTRY.containing_type = _LEGACYMETADATAPROTO
+_LEGACYMETADATAPROTO.fields_by_name['int_to_float'].message_type = _LEGACYMETADATAPROTO_INTTOFLOATENTRY
 DESCRIPTOR.message_types_by_name['DataStream'] = _DATASTREAM
 DESCRIPTOR.message_types_by_name['TensorProto'] = _TENSORPROTO
 DESCRIPTOR.message_types_by_name['ModelHeader'] = _MODELHEADER
@@ -665,6 +887,10 @@ DESCRIPTOR.message_types_by_name['JobRequest'] = _JOBREQUEST
 DESCRIPTOR.message_types_by_name['GlobalTensor'] = _GLOBALTENSOR
 DESCRIPTOR.message_types_by_name['JobReply'] = _JOBREPLY
 DESCRIPTOR.message_types_by_name['ResultsAck'] = _RESULTSACK
+DESCRIPTOR.message_types_by_name['LegacyTensorProto'] = _LEGACYTENSORPROTO
+DESCRIPTOR.message_types_by_name['LegacyModelHeader'] = _LEGACYMODELHEADER
+DESCRIPTOR.message_types_by_name['LegacyModelProto'] = _LEGACYMODELPROTO
+DESCRIPTOR.message_types_by_name['LegacyMetadataProto'] = _LEGACYMETADATAPROTO
 DESCRIPTOR.enum_types_by_name['Job'] = _JOB
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -760,8 +986,45 @@ ResultsAck = _reflection.GeneratedProtocolMessageType('ResultsAck', (_message.Me
   })
 _sym_db.RegisterMessage(ResultsAck)
 
+LegacyTensorProto = _reflection.GeneratedProtocolMessageType('LegacyTensorProto', (_message.Message,), {
+  'DESCRIPTOR' : _LEGACYTENSORPROTO,
+  '__module__' : 'collaborator_aggregator_interface_pb2'
+  # @@protoc_insertion_point(class_scope:openfl_proto.LegacyTensorProto)
+  })
+_sym_db.RegisterMessage(LegacyTensorProto)
+
+LegacyModelHeader = _reflection.GeneratedProtocolMessageType('LegacyModelHeader', (_message.Message,), {
+  'DESCRIPTOR' : _LEGACYMODELHEADER,
+  '__module__' : 'collaborator_aggregator_interface_pb2'
+  # @@protoc_insertion_point(class_scope:openfl_proto.LegacyModelHeader)
+  })
+_sym_db.RegisterMessage(LegacyModelHeader)
+
+LegacyModelProto = _reflection.GeneratedProtocolMessageType('LegacyModelProto', (_message.Message,), {
+  'DESCRIPTOR' : _LEGACYMODELPROTO,
+  '__module__' : 'collaborator_aggregator_interface_pb2'
+  # @@protoc_insertion_point(class_scope:openfl_proto.LegacyModelProto)
+  })
+_sym_db.RegisterMessage(LegacyModelProto)
+
+LegacyMetadataProto = _reflection.GeneratedProtocolMessageType('LegacyMetadataProto', (_message.Message,), {
+
+  'IntToFloatEntry' : _reflection.GeneratedProtocolMessageType('IntToFloatEntry', (_message.Message,), {
+    'DESCRIPTOR' : _LEGACYMETADATAPROTO_INTTOFLOATENTRY,
+    '__module__' : 'collaborator_aggregator_interface_pb2'
+    # @@protoc_insertion_point(class_scope:openfl_proto.LegacyMetadataProto.IntToFloatEntry)
+    })
+  ,
+  'DESCRIPTOR' : _LEGACYMETADATAPROTO,
+  '__module__' : 'collaborator_aggregator_interface_pb2'
+  # @@protoc_insertion_point(class_scope:openfl_proto.LegacyMetadataProto)
+  })
+_sym_db.RegisterMessage(LegacyMetadataProto)
+_sym_db.RegisterMessage(LegacyMetadataProto.IntToFloatEntry)
+
 
 _VALUEDICTIONARY_DICTIONARYENTRY._options = None
+_LEGACYMETADATAPROTO_INTTOFLOATENTRY._options = None
 
 _AGGREGATOR = _descriptor.ServiceDescriptor(
   name='Aggregator',
@@ -769,8 +1032,8 @@ _AGGREGATOR = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=1397,
-  serialized_end=1633,
+  serialized_start=1917,
+  serialized_end=2153,
   methods=[
   _descriptor.MethodDescriptor(
     name='RequestJob',
