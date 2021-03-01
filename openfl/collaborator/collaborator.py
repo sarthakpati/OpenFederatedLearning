@@ -345,8 +345,9 @@ class Collaborator(object):
 
         Runs the validation of the model on the local dataset.
         """
+        self.logger.debug("{} - Beginning {}".format(self, result_name))
         results = self.wrapped_model.validate()
-        self.logger.debug("{} - Completed the validation job.".format(self))
+        self.logger.debug("{} - Completed {}".format(self, result_name))
         data_size = self.wrapped_model.get_validation_data_size()
 
         self.round_results[result_name] = (results, data_size)
