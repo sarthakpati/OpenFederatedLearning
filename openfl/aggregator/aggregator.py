@@ -574,7 +574,7 @@ class StreamingAverage(object):
         else:
             # if a dictionary, we need to update each separately
             if isinstance(self.value, dict):
-                for k, v in self.value:
+                for k, v in self.value.items():
                     self.value[k] = self.weighted_average([v, value[k]], [self.weight, weight])
             else:
                 self.value = self.weighted_average([self.value, value], [self.weight, weight])
