@@ -12,7 +12,7 @@
 # limitations under the License.
 
 import numpy as np
-from openfl.proto.collaborator_aggregator_interface_pb2 import ModelProto, TensorProto, ModelHeader, MetadataProto, DataStream
+from openfl.proto.collaborator_aggregator_interface_pb2 import TensorProto, DataStream
 
 def tensor_proto_to_numpy_array(tensor_proto):
     return np.frombuffer(tensor_proto.data_bytes, dtype=np.float32).reshape(tuple(tensor_proto.shape))
@@ -23,7 +23,7 @@ def numpy_array_to_tensor_proto(array, name):
     array_shape = list(array.shape)
     return TensorProto(name=name, data_bytes=array.tobytes(order='C'), shape=array_shape)
 
-def load_proto(fpath):
+def load_proto(fpath, proto_type):
     """Load the protobuf
 
     Args:
@@ -33,9 +33,7 @@ def load_proto(fpath):
         protobuf: A protobuf of the model
     """
     with open(fpath, "rb") as f:
-        loaded = f.read()
-        model = ModelProto().FromString(loaded)
-        return model
+        return proto_type().FromString(f.read())
 
 def dump_proto(model_proto, fpath):
     """Dumps the protobuf to a file
@@ -72,13 +70,13 @@ def datastream_to_proto(proto, stream, logger=None):
     else:
         raise RuntimeError("Received empty stream message of type {}".format(type(proto)))
 
-def proto_to_datastream(proto, logger, max_buffer_size=(2 * 1024 * 1024)):
+def proto_to_datastream(proto, logger, max_buffer_size=(256 * 1024)):
     """Convert the protobuf to the datastream for the remote connection
 
     Args:
         model_proto: The protobuf of the model
         logger: The log object
-        max_buffer_size: The buffer size (Default= 2*1024*1024)
+        max_buffer_size: The buffer size (Default= 256 * 1024)
     Returns:
         reply: The message for the remote connection.
     """

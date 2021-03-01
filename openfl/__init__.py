@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .utils import load_yaml, get_object, split_tensor_dict_for_holdouts
+from .utils import load_yaml, get_object, split_tensor_dict_for_holdouts, hash_string
 
 
 def check_type(obj, expected_type, logger):

@@ -107,3 +107,8 @@ def split_tensor_dict_for_holdouts(logger, tensor_dict, holdout_types=['non_floa
 
 
     return tensors_to_send, holdout_tensors
+
+def hash_string(s, length=8):
+    md5 = hashlib.md5()
+    md5.update(s.encode())
+    return md5.hexdigest()[:length]

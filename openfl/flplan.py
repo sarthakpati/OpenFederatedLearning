@@ -155,31 +155,19 @@ def create_aggregator_object_from_flplan(flplan,
     init_kwargs['single_col_cert_common_name']  = single_col_cert_common_name
 
     # FIXME: this sort of hackery should be handled by a filesystem abstraction
-    # patch in the full model filepaths
-    for p in ['init', 'latest', 'best']:
-        init_kwargs['{}_model_fpath'.format(p)] = os.path.join(weights_dir, init_kwargs['{}_model_fname'.format(p)])
+    init_kwargs['model_directory'] = os.path.join(weights_dir, init_kwargs['model_directory'])
 
     # FIXME: this sort of hackery should be handled by a filesystem abstraction
     # patch in the base dir
     if 'runtime_aggregator_config_dir' in init_kwargs:
         init_kwargs['runtime_aggregator_config_dir'] = os.path.join(base_dir, init_kwargs['runtime_aggregator_config_dir'])
 
-    # FIXME: this sort of hackery should be handled by a filesystem abstraction
-    # patch in full metadata filepaths
-    for p in ['init', 'latest']:
-        k = '{}_metadata_fname'.format(p)
-        if k in init_kwargs and init_kwargs[k] is not None: 
-            init_kwargs[k] = os.path.join(metadata_dir, init_kwargs[k])
-
     compression_pipeline = create_compression_pipeline(flplan)
 
     # FIXME: another hack that should not be inherited by production openfl
     # if set to "resume", we over-write the "init" values with the "latest" values
     if resume:
-        if 'init_model_fpath' in init_kwargs and 'latest_model_fpath' in init_kwargs:
-            init_kwargs['init_model_fpath'] = init_kwargs['latest_model_fpath']
-        if 'init_metadata_fname' in init_kwargs and 'latest_metadata_fname' in init_kwargs:
-            init_kwargs['init_metadata_fname'] = init_kwargs['latest_metadata_fname']
+        init_kwargs['initial_model'] = 'latest'
 
     return Aggregator(compression_pipeline=compression_pipeline,
                       **init_kwargs)

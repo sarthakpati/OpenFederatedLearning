@@ -19,10 +19,11 @@ import sys
 import logging
 import importlib
 
-from openfl import load_yaml, get_object, split_tensor_dict_for_holdouts
+from openfl import load_yaml, get_object, split_tensor_dict_for_holdouts, hash_string
 from openfl.collaborator.collaborator import OptTreatment
 from openfl.flplan import parse_fl_plan, create_data_object, create_model_object, create_compression_pipeline
-from openfl.proto.protoutils import dump_proto, construct_proto
+from openfl.proto.protoutils import dump_proto, numpy_array_to_tensor_proto
+from openfl.proto.collaborator_aggregator_interface_pb2 import ModelHeader, ExtraModelInfo
 from setup_logging import setup_logging
 
 
@@ -62,8 +63,8 @@ def main(plan, native_model_weights_filepath, collaborators_file, feature_shape,
     flplan = parse_fl_plan(os.path.join(plan_dir, plan))
     local_config = load_yaml(os.path.join(base_dir, data_config_fname))
 
-    # get the output filename
-    fpath = os.path.join(weights_dir, flplan['aggregator_object_init']['init_kwargs']['init_model_fname'])
+    # get the output directory
+    directory = os.path.join(weights_dir, flplan['aggregator_object_init']['init_kwargs']['model_directory'], 'initial')
 
     # create the data object for models whose architecture depends on the feature shape
     if feature_shape is None:
@@ -77,9 +78,8 @@ def main(plan, native_model_weights_filepath, collaborators_file, feature_shape,
         data = get_object('openfl.data.dummy.randomdata', 'RandomData', feature_shape=feature_shape)
         logger.info('Using data object of type {} and feature shape {}'.format(type(data), feature_shape))
 
-    # create the model object and compression pipeline
+    # create the model object
     wrapped_model = create_model_object(flplan, data, model_device=model_device)
-    compression_pipeline = create_compression_pipeline(flplan)
 
     # determine if we need to store the optimizer variables
     # FIXME: what if this key is missing?
@@ -103,16 +103,20 @@ def main(plan, native_model_weights_filepath, collaborators_file, feature_shape,
     logger.warn('Following paramters omitted from global initial model, '\
                 'local initialization will determine values: {}'.format(list(holdout_params.keys())))
 
-    model_proto = construct_proto(tensor_dict=tensor_dict,
-                                  model_id=wrapped_model.__class__.__name__,
-                                  model_version=0,
-                                  is_delta=False,
-                                  delta_from_version=-1,
-                                  compression_pipeline=compression_pipeline)
+    os.makedirs(directory, exist_ok=True)
 
-    dump_proto(model_proto=model_proto, fpath=fpath)
+    model_header = ModelHeader(id=wrapped_model.__class__.__name__, version=0)
+    dump_proto(model_header, os.path.join(directory, 'ModelHeader.pbuf'))
 
-    logger.info("Created initial weights file: {}".format(fpath))
+    extra_model_info = ExtraModelInfo(tensor_names=list(tensor_dict.keys()))
+    dump_proto(extra_model_info, os.path.join(directory, 'ExtraModelInfo.pbuf'))
+
+    for k, v in tensor_dict.items():
+        t_hash = hash_string(k)
+        proto = numpy_array_to_tensor_proto(v, k)
+        dump_proto(proto, os.path.join(directory, '{}.pbuf'.format(t_hash)))
+
+    logger.info("Created initial weights files in directory: {}".format(directory))
 
 
 if __name__ == '__main__':

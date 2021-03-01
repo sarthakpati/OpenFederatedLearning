@@ -21,20 +21,15 @@ class AggregatorStub(object):
                 request_serializer=collaborator__aggregator__interface__pb2.JobRequest.SerializeToString,
                 response_deserializer=collaborator__aggregator__interface__pb2.JobReply.FromString,
                 )
-        self.DownloadModel = channel.unary_stream(
-                '/openfl_proto.Aggregator/DownloadModel',
-                request_serializer=collaborator__aggregator__interface__pb2.ModelDownloadRequest.SerializeToString,
+        self.DownloadTensor = channel.unary_stream(
+                '/openfl_proto.Aggregator/DownloadTensor',
+                request_serializer=collaborator__aggregator__interface__pb2.TensorDownloadRequest.SerializeToString,
                 response_deserializer=collaborator__aggregator__interface__pb2.DataStream.FromString,
                 )
-        self.UploadLocalModelUpdate = channel.stream_unary(
-                '/openfl_proto.Aggregator/UploadLocalModelUpdate',
+        self.UploadResults = channel.stream_unary(
+                '/openfl_proto.Aggregator/UploadResults',
                 request_serializer=collaborator__aggregator__interface__pb2.DataStream.SerializeToString,
-                response_deserializer=collaborator__aggregator__interface__pb2.LocalModelUpdateAck.FromString,
-                )
-        self.UploadLocalMetricsUpdate = channel.unary_unary(
-                '/openfl_proto.Aggregator/UploadLocalMetricsUpdate',
-                request_serializer=collaborator__aggregator__interface__pb2.LocalValidationResults.SerializeToString,
-                response_deserializer=collaborator__aggregator__interface__pb2.LocalValidationResultsAck.FromString,
+                response_deserializer=collaborator__aggregator__interface__pb2.ResultsAck.FromString,
                 )
 
 
@@ -50,19 +45,13 @@ class AggregatorServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def DownloadModel(self, request, context):
+    def DownloadTensor(self, request, context):
         """Missing associated documentation comment in .proto file"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def UploadLocalModelUpdate(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file"""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def UploadLocalMetricsUpdate(self, request, context):
+    def UploadResults(self, request_iterator, context):
         """Missing associated documentation comment in .proto file"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -76,20 +65,15 @@ def add_AggregatorServicer_to_server(servicer, server):
                     request_deserializer=collaborator__aggregator__interface__pb2.JobRequest.FromString,
                     response_serializer=collaborator__aggregator__interface__pb2.JobReply.SerializeToString,
             ),
-            'DownloadModel': grpc.unary_stream_rpc_method_handler(
-                    servicer.DownloadModel,
-                    request_deserializer=collaborator__aggregator__interface__pb2.ModelDownloadRequest.FromString,
+            'DownloadTensor': grpc.unary_stream_rpc_method_handler(
+                    servicer.DownloadTensor,
+                    request_deserializer=collaborator__aggregator__interface__pb2.TensorDownloadRequest.FromString,
                     response_serializer=collaborator__aggregator__interface__pb2.DataStream.SerializeToString,
             ),
-            'UploadLocalModelUpdate': grpc.stream_unary_rpc_method_handler(
-                    servicer.UploadLocalModelUpdate,
+            'UploadResults': grpc.stream_unary_rpc_method_handler(
+                    servicer.UploadResults,
                     request_deserializer=collaborator__aggregator__interface__pb2.DataStream.FromString,
-                    response_serializer=collaborator__aggregator__interface__pb2.LocalModelUpdateAck.SerializeToString,
-            ),
-            'UploadLocalMetricsUpdate': grpc.unary_unary_rpc_method_handler(
-                    servicer.UploadLocalMetricsUpdate,
-                    request_deserializer=collaborator__aggregator__interface__pb2.LocalValidationResults.FromString,
-                    response_serializer=collaborator__aggregator__interface__pb2.LocalValidationResultsAck.SerializeToString,
+                    response_serializer=collaborator__aggregator__interface__pb2.ResultsAck.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -121,7 +105,7 @@ class Aggregator(object):
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def DownloadModel(request,
+    def DownloadTensor(request,
             target,
             options=(),
             channel_credentials=None,
@@ -130,14 +114,14 @@ class Aggregator(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/openfl_proto.Aggregator/DownloadModel',
-            collaborator__aggregator__interface__pb2.ModelDownloadRequest.SerializeToString,
+        return grpc.experimental.unary_stream(request, target, '/openfl_proto.Aggregator/DownloadTensor',
+            collaborator__aggregator__interface__pb2.TensorDownloadRequest.SerializeToString,
             collaborator__aggregator__interface__pb2.DataStream.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def UploadLocalModelUpdate(request_iterator,
+    def UploadResults(request_iterator,
             target,
             options=(),
             channel_credentials=None,
@@ -146,24 +130,8 @@ class Aggregator(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.stream_unary(request_iterator, target, '/openfl_proto.Aggregator/UploadLocalModelUpdate',
+        return grpc.experimental.stream_unary(request_iterator, target, '/openfl_proto.Aggregator/UploadResults',
             collaborator__aggregator__interface__pb2.DataStream.SerializeToString,
-            collaborator__aggregator__interface__pb2.LocalModelUpdateAck.FromString,
-            options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def UploadLocalMetricsUpdate(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/openfl_proto.Aggregator/UploadLocalMetricsUpdate',
-            collaborator__aggregator__interface__pb2.LocalValidationResults.SerializeToString,
-            collaborator__aggregator__interface__pb2.LocalValidationResultsAck.FromString,
+            collaborator__aggregator__interface__pb2.ResultsAck.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)

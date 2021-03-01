@@ -20,7 +20,7 @@ import logging
 import time
 
 from ...proto import datastream_to_proto, proto_to_datastream
-from ...proto.collaborator_aggregator_interface_pb2 import LocalModelUpdate
+from ...proto.collaborator_aggregator_interface_pb2 import ResultsUpload
 from ...proto.collaborator_aggregator_interface_pb2_grpc import AggregatorServicer, add_AggregatorServicer_to_server
 
 class AggregatorGRPCServer(AggregatorServicer):
@@ -46,7 +46,7 @@ class AggregatorGRPCServer(AggregatorServicer):
             ValueError: If the collaborator or collaborator certificate is not valid then raises error.
 
         """
-        if not self.disable_tls:
+        if not self.disable_tls and not self.disable_client_auth:
             common_name = context.auth_context()['x509_common_name'][0].decode("utf-8")
             collaborator_common_name = request.header.sender
             if not self.aggregator.valid_collaborator_CN_and_id(common_name, collaborator_common_name):
@@ -63,7 +63,7 @@ class AggregatorGRPCServer(AggregatorServicer):
         self.validate_collaborator(request, context)
         return self.aggregator.RequestJob(request)
 
-    def DownloadModel(self, request, context):
+    def DownloadTensor(self, request, context):
         """gRPC request for a model download from aggregator
 
         Args:
@@ -73,10 +73,10 @@ class AggregatorGRPCServer(AggregatorServicer):
         """
         self.validate_collaborator(request, context)
         # turn global model update into data stream
-        proto = self.aggregator.DownloadModel(request)
+        proto = self.aggregator.DownloadTensor(request)
         return proto_to_datastream(proto, self.logger)
 
-    def UploadLocalModelUpdate(self, request, context):
+    def UploadResults(self, request, context):
         """gRPC request for a model upload to an aggregator
 
         Args:
@@ -84,22 +84,11 @@ class AggregatorGRPCServer(AggregatorServicer):
             context: The gRPC context
 
         """
-        proto = LocalModelUpdate()
+        proto = ResultsUpload()
         proto = datastream_to_proto(proto, request)
         self.validate_collaborator(proto, context)
         # turn data stream into local model update
-        return self.aggregator.UploadLocalModelUpdate(proto)
-
-    def UploadLocalMetricsUpdate(self, request, context):
-        """gRPC request for a local metric to upload to collaborator.
-
-        Args:
-            request: The gRPC message request
-            context: The gRPC context
-
-        """
-        self.validate_collaborator(request, context)
-        return self.aggregator.UploadLocalMetricsUpdate(request)
+        return self.aggregator.UploadResults(proto)
 
     def serve(self,
               agg_port,
@@ -121,7 +110,7 @@ class AggregatorGRPCServer(AggregatorServicer):
             kwargs (dict): Additional arguments to pass into function
         """
         logger = logging.getLogger(__name__)
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=1),
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=8),
                              options=[('grpc.max_metadata_size', 32 * 1024 * 1024),
                                       ('grpc.max_send_message_length', 128 * 1024 * 1024),
                                       ('grpc.max_receive_message_length', 128 * 1024 * 1024)])
@@ -129,6 +118,7 @@ class AggregatorGRPCServer(AggregatorServicer):
         uri = "[::]:{port:d}".format(port=agg_port)
         self.disable_tls = disable_tls
         self.logger = logger
+        self.disable_client_auth = disable_client_auth
 
         if disable_tls:
             logger.warn('gRPC is running on insecure channel with TLS disabled.')
@@ -155,7 +145,7 @@ class AggregatorGRPCServer(AggregatorServicer):
         logger.info('Starting aggregator.')
         server.start()
         try:
-            while not self.aggregator.all_quit_jobs_sent():
+            while not self.aggregator.time_to_quit():
                 time.sleep(5)
         except KeyboardInterrupt:
             pass

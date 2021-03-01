@@ -20,11 +20,8 @@ package openfl_proto;
 
 service Aggregator {
     rpc RequestJob(JobRequest) returns (JobReply) {}
-    rpc DownloadGlobalTensor(GlobalTensorDownloadRequest) returns (stream DataStream) {}
-    rpc DownloadModelInfo(ModelInfoRequest) returns (ModelInfo) {}
-    rpc UploadLocalLossResults(LocalLossResults) returns (LocalLossResultsAck) {}
-    rpc UploadLocalTensorUpdate(stream DataStream) returns (LocalTensorUpdateAck) {}
-    rpc UploadLocalMetricsUpdate(LocalValidationResults) returns (LocalValidationResultsAck) {}
+    rpc DownloadTensor(TensorDownloadRequest) returns (stream DataStream) {}
+    rpc UploadResults(stream DataStream) returns (ResultsAck) {}
 }
 
 // handles large size data
@@ -34,18 +31,10 @@ message DataStream {
 }
 
 enum Job {
-    JOB_TRAIN = 0;
-    JOB_VALIDATE = 1;
-    JOB_YIELD = 2;
+    JOB_DOWNLOAD_MODEL = 0;
+    JOB_UPLOAD_RESULTS = 1;
+    JOB_SLEEP = 2;
     JOB_QUIT = 3;
-    JOB_DOWNLOAD_MODEL = 4;
-    JOB_UPLOAD_LAYER = 5;
-}
-
-message MetadataProto {
-    map<int32, float> int_to_float = 1;
-    repeated int32 int_list = 2;
-    repeated bool bool_list = 3;
 }
 
 message TensorProto {
@@ -54,107 +43,69 @@ message TensorProto {
     repeated int32 shape = 3;
 }
 
-// Everything but 'sender' is effectively just for sanity checking during testing
-message MessageHeader {
-    string sender = 1;
-    string recipient = 2;
-    string federation_id = 3;
-    // FIXME: really a nonce
-    int32 counter = 4; // FIXME: better sanity check device?
-    string single_col_cert_common_name = 5;
-}
-
 message ModelHeader {
     string id = 1;
     int32 version = 2;
 }
 
-message ModelProto {
-    ModelHeader header = 1;
-    repeated TensorProto tensors = 2;
+// Everything but 'sender' is effectively just for sanity checking during testing
+message MessageHeader {
+    string sender = 1;
+    string recipient = 2;
+    string federation_id = 3;
+    ModelHeader model_header = 4;
+    // FIXME: really a nonce
+    int32 counter = 5; // FIXME: better sanity check device?
+    string single_col_cert_common_name = 6;
+}
+
+message ExtraModelInfo {
+    repeated string tensor_names = 1;
+}
+
+message ValueDictionary {
+    map<string, float> dictionary = 1;
 }
 
 // COLLABORATOR MESSAGES
-
-message GlobalTensorDownloadRequest {
+message TensorDownloadRequest {
     MessageHeader header = 1;
     string tensor_name = 2;
 }
 
-message ModelInfoRequest {
+message ResultsUpload {
     MessageHeader header = 1;
-}
-
-message LocalLossResults {
-    MessageHeader header = 1;
-    ModelHeader model_header = 2;
-    float loss = 3;
-    int32 data_size = 4;
-}
-
-message LocalTensorUpdate {
-    MessageHeader header = 1;
-    ModelHeader model_header = 2;
-    TensorProto tensor = 3;
-    int32 data_size = 4;
-}
-
-message LocalValidationResults {
-    MessageHeader header = 1;
-    ModelHeader model_header = 2;
-    // Python Dictionary
-    map<string, float> results = 3;
-    int32 data_size = 4;
+    int32 weight = 2;
+    string task = 3;
+    oneof extra {
+        TensorProto tensor = 4;
+        float value = 5;
+        ValueDictionary value_dict = 6;
+    }
 }
 
 message JobRequest {
     MessageHeader header = 1;
-    ModelHeader model_header = 2;
-}
-
-message RoundTaskQuery {
-    MessageHeader header = 1;
-    map<string, int32> task_results_last_sync = 2;
 }
 
 // AGGREGATOR MESSAGES
 
-// message GlobalModelUpdate {
-//     MessageHeader header = 1;
-//     ModelProto model = 2;
-//     bool is_global_best = 3;
-//     string metadata_yaml = 4;
-// }
-
-message GlobalTensorUpdate {
+message GlobalTensor {
     MessageHeader header = 1;
-    ModelHeader model_header = 2;
-    TensorProto tensor = 3;
+    TensorProto tensor = 2;
 }
 
 message JobReply {
     MessageHeader header = 1;
     Job job = 2;
-    string extra = 3;
+    oneof extra {
+        ExtraModelInfo extra_model_info = 3;
+        string name = 4;
+        int32 seconds = 5;
+    }
 }
 
-message LocalTensorUpdateAck {
+message ResultsAck {
     MessageHeader header = 1;
-    bool discard_updates = 2;
-}
-
-message LocalValidationResultsAck {
-    MessageHeader header = 1;
-}
-
-message LocalLossResultsAck {
-    MessageHeader header = 1;
-}
-
-message ModelInfo {
-    MessageHeader header = 1;
-    ModelHeader model_header = 2;
-    repeated string tensor_names = 3;
-    bool is_global_best = 4;
-    string metadata_yaml = 5;
+    bool discard_round = 2;
 }

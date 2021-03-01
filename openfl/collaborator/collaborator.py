@@ -18,14 +18,10 @@ import numpy as np
 from .. import check_type, check_equal, check_not_equal, split_tensor_dict_for_holdouts
 from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader
 from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply
-from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_QUIT, JOB_TRAIN, JOB_VALIDATE, JOB_YIELD
-from ..proto.collaborator_aggregator_interface_pb2 import ModelProto, ModelHeader, TensorProto
-from ..proto.collaborator_aggregator_interface_pb2 import ModelDownloadRequest, GlobalModelUpdate
-from ..proto.collaborator_aggregator_interface_pb2 import LocalModelUpdate, LocalModelUpdateAck
-from ..proto.collaborator_aggregator_interface_pb2 import LocalValidationResults, LocalValidationResultsAck
+from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
+from ..proto.collaborator_aggregator_interface_pb2 import ModelHeader, TensorProto, TensorDownloadRequest, ResultsUpload
+from ..proto.protoutils import tensor_proto_to_numpy_array, numpy_array_to_tensor_proto
 
-from openfl.tensor_transformation_pipelines import NoCompressionPipeline
-from openfl.proto.protoutils import construct_proto, deconstruct_proto
 
 from enum import Enum
 
@@ -73,23 +69,18 @@ class Collaborator(object):
                  federation_uuid,
                  wrapped_model,
                  channel,
-                 polling_interval=4,
                  opt_treatment="CONTINUE_GLOBAL",
                  compression_pipeline=None,
                  epochs_per_round=1.0,
                  num_batches_per_round=None,
                  send_model_deltas = False,
                  single_col_cert_common_name=None,
-                 save_best_native_path=None,
-                 save_best_native_kwargs=None,
-                 save_metadata_path=None,
+                 num_retries=5,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.channel = channel
-        self.polling_interval = polling_interval
-        self.save_best_native_path = save_best_native_path
-        self.save_best_native_kwargs = save_best_native_kwargs
-        self.save_metadata_path = save_metadata_path
+        self.num_retries = num_retries
+        self.polling_interval = 10
 
         # this stuff is really about sanity/correctness checking to ensure the bookkeeping and control flow is correct
         self.common_name = collaborator_common_name
@@ -100,8 +91,6 @@ class Collaborator(object):
             self.single_col_cert_common_name = '' # FIXME: this is just for protobuf compatibility. Cleaner solution?
         self.counter = 0
         self.model_header = ModelHeader(id=wrapped_model.__class__.__name__,
-                                        is_delta=send_model_deltas,
-                                        delta_from_version=-1,
                                         version=-1)
         # number of epochs to perform per round of FL (is a float that is converted
         # to num_batches before calling the wrapped model train_batches method).
@@ -113,9 +102,8 @@ class Collaborator(object):
 
         self.wrapped_model = wrapped_model
         self.tensor_dict_split_fn_kwargs = wrapped_model.tensor_dict_split_fn_kwargs or {}
-
-        # pipeline translating tensor_dict to and from a list of tensor protos
-        self.compression_pipeline = compression_pipeline or NoCompressionPipeline()
+        self.local_model_has_been_trained = False
+        self.round_results = {}
 
         # RESET/CONTINUE_LOCAL/CONTINUE_GLOBAL
         if hasattr(OptTreatment, opt_treatment):
@@ -127,11 +115,6 @@ class Collaborator(object):
         # FIXME: this is a temporary fix for non-float values and other named params designated to hold out from aggregation.
         # Needs updated when we have proper collab-side state saving.
         self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
-        # when sending model deltas, baseline values for shared tensors must be kept
-        self.send_model_deltas = send_model_deltas
-        # the base_for_deltas attibute is only accessed in the case that model deltas are being sent
-        if self.send_model_deltas:
-            self.base_for_deltas = {"tensor_dict": None, "version": None}
 
     def _remove_and_save_holdout_tensors(self, tensor_dict):
         """Removes tensors from the tensor dictionary
@@ -150,59 +133,6 @@ class Collaborator(object):
             self.logger.debug("{} removed {} from tensor_dict".format(self, list(self.holdout_tensors.keys())))
         return shared_tensors
 
-    def create_deltas(self, tensor_dict):
-        """Calculates the model delta from the tensor dictionary
-
-        Args:
-            tensor_dict: Dictionary of tensors
-
-        Returns:
-            A dictionary of the delta between the tensor_dict and the base tensor_dict
-        """
-
-        if not self.send_model_deltas:
-            raise ValueError("Should not be creating deltas when not sending deltas.")
-        base_tensors = self.base_for_deltas["tensor_dict"]
-        base_version = self.base_for_deltas["version"]
-        if base_tensors is None:
-            raise ValueError("Attempting to create deltas when no base tensors are known.")
-        elif set(base_tensors.keys()) != set(tensor_dict.keys()):
-            raise ValueError("Attempting to convert to deltas when base tensor names do not match ones to convert.")
-        else:
-            deltas = {"tensor_dict": {key: (tensor_dict[key] - base_tensors[key]) for key in base_tensors},
-                      "delta_from_version": base_version}
-        return deltas
-
-    def update_base_for_deltas(self, tensor_dict, delta_from_version, version, is_delta=True):
-        """Update the base model weights with the delta weights from the aggregator
-
-        Args:
-            tensor_dict: Dictionary of tensors
-            delta_from_version: The delta tensors for the update
-            version: The new version of the model
-
-        """
-
-        if not self.send_model_deltas:
-            raise ValueError("Should not be handing a base for deltas when not sending deltas.")
-        if self.base_for_deltas["tensor_dict"] is None:
-            if is_delta:
-                raise ValueError("Attempting to update undefined base tensors with a delta.")
-            else:
-                self.base_for_deltas["tensor_dict"] = tensor_dict
-                self.base_for_deltas["version"] = version
-        else:
-            if is_delta:
-                if set(self.base_for_deltas["tensor_dict"].keys()) != set(tensor_dict.keys()):
-                    raise ValueError("Attempting to update base with tensors whose names do not match current base names.")
-                if delta_from_version != self.base_for_deltas["version"]:
-                    raise ValueError("Attempting update of base with delta measured against different base.")
-                self.base_for_deltas["tensor_dict"] = {key: (self.base_for_deltas["tensor_dict"][key] + tensor_dict[key]) for key in tensor_dict}
-                self.base_for_deltas["version"] = version
-            else:
-                raise NotImplementedError("Non-delta updates of base tensors currrently only expected for first update.")
-
-
     def create_message_header(self):
         """Create a message header to send to network
 
@@ -210,7 +140,12 @@ class Collaborator(object):
             Message header for network communications
 
         """
-        header = MessageHeader(sender=self.common_name, recipient=self.aggregator_uuid, federation_id=self.federation_uuid, counter=self.counter, single_col_cert_common_name=self.single_col_cert_common_name)
+        header = MessageHeader(sender=self.common_name,
+                               recipient=self.aggregator_uuid,
+                               federation_id=self.federation_uuid,
+                               counter=self.counter,
+                               single_col_cert_common_name=self.single_col_cert_common_name,
+                               model_header=self.model_header)
         return header
 
     def __repr__(self):
@@ -280,7 +215,7 @@ class Collaborator(object):
         self.logger.debug("The optimizer variable treatment is [%s]." % self.opt_treatment)
         while True:
             # query for job and validate it
-            reply = self.channel.RequestJob(JobRequest(header=self.create_message_header(), model_header=self.model_header))
+            reply = self.channel.RequestJob(JobRequest(header=self.create_message_header()))
             self.validate_header(reply)
             check_type(reply, JobReply, self.logger)
             job = reply.job
@@ -288,12 +223,11 @@ class Collaborator(object):
             self.logger.debug("%s - Got a job %s" % (self, Job.Name(job)))
 
             if job is JOB_DOWNLOAD_MODEL:
-                self.do_download_model_job()
-            elif job is JOB_VALIDATE:
-                self.do_validate_job()
-            elif job is JOB_TRAIN:
-                self.do_train_job()
-            elif job is JOB_YIELD:
+                self.do_download_model_job(reply.extra_model_info.tensor_names)
+            elif job is JOB_UPLOAD_RESULTS:
+                self.do_upload_results_job(reply.name)
+            elif job is JOB_SLEEP:
+                self.polling_interval = reply.seconds
                 return False
             elif job is JOB_QUIT:
                 return True
@@ -312,7 +246,59 @@ class Collaborator(object):
             self.logger.debug("Share the optimization variables.")
             return True
 
-    def do_train_job(self):
+    def do_upload_results_job(self, task):
+        if task not in self.round_results:
+            self.do_task(task)
+
+        # now we can upload the result
+        result, weight = self.round_results[task]
+
+        request = ResultsUpload(header=self.create_message_header(),
+                                weight=weight,
+                                task=task)
+
+        if isinstance(result, np.ndarray):
+            request = ResultsUpload(header=self.create_message_header(),
+                                    weight=weight,
+                                    task=task,
+                                    tensor=numpy_array_to_tensor_proto(result, task))
+        elif isinstance(result, dict):
+            request = ResultsUpload(header=self.create_message_header(),
+                                    weight=weight,
+                                    task=task,
+                                    value_dict=ValueDictionary(dictionary=result))
+        else:
+            request = ResultsUpload(header=self.create_message_header(),
+                                    weight=weight,
+                                    task=task,
+                                    value=result)
+
+        self._request_with_retries(request, upload=True)
+
+    def do_task(self, task):
+        # FIXME: this should really not be hard-coded
+        if task == 'shared_model_validation':
+            # sanity check that we have not trained
+            if self.local_model_has_been_trained:
+                raise RuntimeError("Logic error! We should not have trained!")
+            self.do_validation_task('shared_model_validation')
+        elif task == 'loss':
+            # sanity check that we have not trained
+            if self.local_model_has_been_trained:
+                raise RuntimeError("Logic error! We should not have trained!")
+            self.do_train_task()
+        elif task == 'local_model_validation':
+            # sanity check that we have trained
+            if not self.local_model_has_been_trained:
+                raise RuntimeError("Logic error! We should have trained!")
+            self.do_validation_task('local_model_validation')
+        else:
+            # if we are here, we reported a loss, then crashed before we uploaded remaining tensors
+            # in this case, we are going to retrain
+            self.logger.info("Retraining for remaining results.")
+            self.do_train_task()
+
+    def do_train_task(self):
         """Train the model.
 
         This is the code that actual runs the model training on the collaborator.
@@ -332,6 +318,8 @@ class Collaborator(object):
             num_batches = int(np.floor(batches_per_epoch * self.epochs_per_round))
         train_info = self.wrapped_model.train_batches(num_batches=num_batches)
 
+        self.local_model_has_been_trained = True
+
         self.logger.debug("{} Completed the training job for {} batches.".format(self, num_batches))
 
         # allowing extra information regarding training to be logged (for now none of the extra info is sent to the aggregator)
@@ -340,35 +328,19 @@ class Collaborator(object):
             self.logger.debug("{} model is returning dictionary of training info: {}".format(self, train_info))
         else:
             loss = train_info
- 
+
+        self.round_results['loss'] = (loss, data_size)
+
         # get the trained tensor dict and store any designated to be held out from aggregation
         shared_tensors = self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
 
-        # send each tensor individually
-        for name, tensor in shared_tensors:
-            tensor_proto = numpy_array_to_tensor_proto(tensor, name)
-            request = LocalTensorUpdate(header=self.create_message_header(),
-                                        model_header=self.model_header,
-                                        tensor=tensor_proto,
-                                        data_size=data_size)
-            try:
-                reply = self.channel.UploadLocalModelUpdate(request)
-            except Exception as e:
-                self.logger.exception(repr(e))
-                self.logger.warning("Retrying upload of tensor {}".format(name))
-                reply = self.channel.UploadLocalModelUpdate(request)
-
-            self.validate_header(reply)
-            check_type(reply, LocalTensorUpdateAck, self.logger)
-            self.logger.info("{} - sent to {} aggregator".format(self, name))
-
-            if reply.discard_updates:
-                self.logger.info("Aggregator discarding update. Canceling send.")
-                return
+        # store each resulting tensor
+        for k, v in shared_tensors.items():
+            self.round_results[k] = (v, data_size)
 
         self.logger.info("{} - Train job complete".format(self))
 
-    def do_validate_job(self):
+    def do_validation_task(self, result_name):
         """Validate the model (locally)
 
         Runs the validation of the model on the local dataset.
@@ -377,56 +349,71 @@ class Collaborator(object):
         self.logger.debug("{} - Completed the validation job.".format(self))
         data_size = self.wrapped_model.get_validation_data_size()
 
-        # FIXME: this is a hack to help with older models that don't return dictionaries
-        if not isinstance(results, dict):
-            results = {'validation': results}
+        self.round_results[result_name] = (results, data_size)
 
-        reply = self.channel.UploadLocalMetricsUpdate(LocalValidationResults(header=self.create_message_header(), model_header=self.model_header, results=results, data_size=data_size))
+    def _request_with_retries(self, request, upload=False):
+        # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
+        # an exception can happen in cases where we simply need to retry
+        for i in range(self.num_retries):
+            try:
+                if upload:
+                    reply = self.channel.UploadResults(request)
+                else:
+                    reply = self.channel.DownloadTensor(request)
+                break
+            except Exception as e:
+                self.logger.exception(repr(e))
+                # if final retry, raise exception
+                if i + 1 == self.num_retries:
+                    raise e
+                else:
+                    self.logger.warning("Retrying {}. Try {} of {}".format(request.__class__.__name__, i+1, self.num_retries))
+        
         self.validate_header(reply)
-        check_type(reply, LocalValidationResultsAck, self.logger)
+        return reply
 
-    def do_download_model_job(self):
+    def do_download_model_job(self, tensor_names):
         """Download model operation
 
         Asks the aggregator for the latest model to download and downloads it.
 
         """
-
         # time the download
         download_start = time.time()
 
-        # get the tensor names
-        model_info = self.channel.DownloadModelInfo(ModelInfoRequest(header=self.create_message_header()))
+        # set to the first header we receive
+        new_model_header = None
 
-        # ensure we are actually downloading a new model version
-        check_not_equal(model_info.model_header.version, self.model_header.version, self.logger)
+        # download all of the tensors in the list
+        downloaded_tensors = {}
+        for tensor_name in tensor_names:
+            request = TensorDownloadRequest(header=self.create_message_header(), tensor_name=tensor_name)
+            global_tensor = self._request_with_retries(request, upload=False)
 
-        # validation of reply
-        check_type(model_info, ModelInfo, self.logger)
-        self.validate_header(model_info)        
-
-        # download each tensor into our dictionary
-        agg_tensor_dict = {}
-        for t in reply.tensor_names:
-            request = GlobalTensorDownloadRequest(header=self.create_message_header(), tensor_name=t)
-            tensor_update = self.channel.DownloadGlobalTensor(request)
-
-            # validation of reply
-            check_type(tensor_update, GlobalTensorUpdate, self.logger)
-            self.validate_header(reply)
-
-            # if the version has changed from when we got the model info, we need to exit and get a new job
-            if tensor_update.model_header.version > model_info.model_header.version:
-                self.logger.info("{} canceling download model job, as model appears to have updated".format(self))
+            # if this is our first tensor downloaded, we set first version
+            if new_model_header is None:
+                new_model_header = global_tensor.header.model_header
+            # otherwise, if the tensor versions have changed, we need to exit and request new job
+            elif new_model_header.version != global_tensor.header.model_header.version:
+                self.logger("Tensor versions have changed. Canceling Download")
                 return
-            
-            # version is consistent, so we can proceed
-            agg_tensor_dict[t] = tensor_proto_to_numpy_array(tensor_update.tensor)
-        
+
+            # ensure names match
+            check_equal(tensor_name, global_tensor.tensor.name, self.logger)
+
+            downloaded_tensors[tensor_name] = global_tensor.tensor
+
+        # now we have downloaded all of the tensors
         self.logger.info("{} took {} seconds to download the model".format(self, round(time.time() - download_start, 3)))
-        
+
+        # check if our version has been reverted, possibly due to an aggregator reset
+        version_reverted = self.model_header.version > new_model_header.version
+
+        # extract all of our tensors
+        agg_tensor_dict = {k: tensor_proto_to_numpy_array(downloaded_tensors[k]) for k, v in downloaded_tensors.items()}
+
         # set our model header
-        self.model_header = model_info.model_header
+        self.model_header = new_model_header
 
         # restore any tensors held out from aggregation
         tensor_dict = {**agg_tensor_dict, **self.holdout_tensors}
@@ -438,23 +425,16 @@ class Collaborator(object):
 
         # Ensuring proper initialization regardless of model state. Initial global models
         # do not contain optimizer state, and so cannot be used to reset the optimizer params.
-        if model_info.model.header.version == 0:
+        # Additionally, in any mode other than continue global, if we received an older model, we need to
+        # reset our optimizer parameters
+        if self.model_header.version == 0 or \
+           (self.opt_treatment != OptTreatment.CONTINUE_GLOBAL and version_reverted):
             with_opt_vars = False
+            self.logger.info("Resetting optimizer vars")
             self.wrapped_model.reset_opt_vars()
 
         self.wrapped_model.set_tensor_dict(tensor_dict, with_opt_vars=with_opt_vars)
         self.logger.debug("Loaded the model.")
-
-        # if we are supposed to save the best model and the model is the best, we save it
-        if model_info.is_global_best and self.save_best_native_path:
-            self.wrapped_model.save_native(self.save_best_native_path, self.save_best_native_kwargs)
-            self.logger.info("Saving best model to {}".format(self.save_best_native_path))
-
-        # if we should save metadata and have meta in protobuf
-        if self.save_metadata_path is not None and model_info.metadata_yaml is not None:
-            with open(self.save_metadata_path, 'w') as f:
-                f.write(model_info.metadata_yaml)
-                self.logger.info("Wrote metadata to {}".format(self.save_metadata_path))
 
         # FIXME: for the CONTINUE_LOCAL treatment, we need to store the status in case of a crash.
         if self.opt_treatment == OptTreatment.RESET:
@@ -465,3 +445,7 @@ class Collaborator(object):
                 raise
             else:
                 self.logger.debug("Reset the optimization variables.")
+
+        # finally, we need to reset our trained and metrics states
+        self.local_model_has_been_trained = False
+        self.round_results = {}

@@ -15,23 +15,19 @@ import time
 import os
 import logging
 import time
-import hashlib
+from collections import namedtuple
 
 import numpy as np
 import yaml
 from threading import Lock
 
-from .. import check_equal, check_not_equal, check_is_in, check_not_in, load_yaml
-from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader
-from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply
-from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_QUIT, JOB_TRAIN, JOB_VALIDATE, JOB_YIELD
-from ..proto.collaborator_aggregator_interface_pb2 import ModelProto, ModelHeader, TensorProto
-from ..proto.collaborator_aggregator_interface_pb2 import ModelDownloadRequest, GlobalModelUpdate
-from ..proto.collaborator_aggregator_interface_pb2 import LocalModelUpdate, LocalValidationResults, LocalModelUpdateAck, LocalValidationResultsAck
+from .. import check_equal, check_not_equal, check_is_in, check_not_in, load_yaml, hash_string
+from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ModelHeader, TensorProto
+from ..proto.collaborator_aggregator_interface_pb2 import GlobalTensor, JobReply, ResultsAck, ExtraModelInfo
+from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest
+from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
+from openfl.proto.protoutils import dump_proto, load_proto, tensor_proto_to_numpy_array, numpy_array_to_tensor_proto
 
-
-from openfl.proto.protoutils import dump_proto, load_proto, construct_proto, deconstruct_proto
-from openfl.tensor_transformation_pipelines import NoCompressionPipeline
 
 # FIXME: simpler "stats" collection/handling
 # FIXME: remove the round tracking/job-result tracking stuff from this?
@@ -52,7 +48,6 @@ class Aggregator(object):
         straggler_cutoff_time (scalar)          : Aggregator will not end a round early until this number of seconds has passed. (default: np.inf)
         single_col_cert_common_name (string)    : (default: None)
         compression_pipeline                    : (default: None)
-        end_of_round_metadata (list of str)     : (default: None)
         init_metadata_fname (string)            : (default: None)
         latest_metadata_fname (string)          : (default: None)
         send_metadata_to_clients (bool)         : (default: False)
@@ -63,28 +58,25 @@ class Aggregator(object):
                  aggregator_uuid,
                  federation_uuid,
                  collaborator_common_names,
-                 init_model_fpath,
-                 latest_model_fpath,
-                 best_model_fpath,
+                 model_directory,
+                 initial_model='initial',
                  rounds_to_train=256,
                  minimum_reporting=-1,
                  straggler_cutoff_time=np.inf,
                  single_col_cert_common_name=None,
                  compression_pipeline=None,
-                 end_of_round_metadata=None,
-                 init_metadata_fname=None,
-                 latest_metadata_fname=None,
                  send_metadata_to_clients=False,
-                 save_all_models_path=None,
+                 backup_path=None,
                  runtime_aggregator_config_dir=None,
                  runtime_configurable_params=None,
+                 collaborator_sleep_time=10,
+                 best_model_metric='shared_model_validation',
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
         self.federation_uuid = federation_uuid
 
-        self.latest_model_fpath = latest_model_fpath
-        self.best_model_fpath = best_model_fpath
+        self.model_directory = model_directory
         self.collaborator_common_names = collaborator_common_names
         self.rounds_to_train = rounds_to_train
         self.quit_job_sent_to = []
@@ -92,8 +84,9 @@ class Aggregator(object):
         self.straggler_cutoff_time = straggler_cutoff_time
         self.round_start_time = None
         self.single_col_cert_common_name = single_col_cert_common_name
+        self.collaborator_sleep_time = collaborator_sleep_time
 
-        self.save_all_models_path = save_all_models_path
+        self.backup_path = backup_path
         self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
         self.runtime_configurable_params = runtime_configurable_params
 
@@ -105,34 +98,60 @@ class Aggregator(object):
         else:
             self.single_col_cert_common_name = '' # FIXME: '' instead of None is just for protobuf compatibility. Cleaner solution?
 
-        # FIXME: Should we do anything to insure the intial model is compressed?
-        self.set_model_to(load_proto(init_model_fpath))
-        self.logger.info("Loaded initial model from {}".format(init_model_fpath))
-        self.logger.info("Initial model version is {}".format(self.model.header.version))
+        self.tensors = {}
+        self.load_model(os.path.join(model_directory, initial_model))
 
-        self.round_num = self.model.header.version + 1
+        self.round_num = self.model_header.version + 1
 
-        self.model_update_in_progress = None
+        self._GRACEFULLY_QUIT = False
+        self._do_quit = False
 
-        self.init_per_col_round_stats()
+        self.initialize_round_results()
         self.best_model_score = None
-        self.aggregated_model_is_global_best = True
+        self.best_model_metric = best_model_metric
         self.mutex = Lock()
 
-        self.compression_pipeline = compression_pipeline or NoCompressionPipeline()
+    def create_task_list(self):
+        self.metrics_tasks = ['shared_model_validation', 'loss', 'local_model_validation']
+        # FIXME: this is fixed for now to the same each round
+        self.tasks = self.metrics_tasks[0:2]
+        self.tasks.extend(self.model_tensors)
+        self.tasks.append(self.metrics_tasks[2])
+        self.logger.info("Tasks set to {}".format(self.tasks))        
 
-        self.end_of_round_metadata      = end_of_round_metadata
-        self.init_metadata_fname        = init_metadata_fname
-        self.latest_metadata_fname      = latest_metadata_fname
-        self.send_metadata_to_clients   = send_metadata_to_clients
+    def load_model(self, directory):
+        self.model_header = load_proto(os.path.join(directory, 'ModelHeader.pbuf'), proto_type=ModelHeader)
+        self.extra_model_info = load_proto(os.path.join(directory, 'ExtraModelInfo.pbuf'), proto_type=ExtraModelInfo)
 
-        if self.init_metadata_fname is not None:
-            self.metadata = load_yaml(init_metadata_fname)
-        else:
-            self.metadata = {}
-        self.metadata['aggregator_uuid'] = aggregator_uuid
-        self.metadata['federation_uuid'] = federation_uuid
-        self.metadata_for_round = {}
+        self.model_tensors = self.extra_model_info.tensor_names
+        self.create_task_list()
+
+        for t in self.extra_model_info.tensor_names:
+            t_hash = hash_string(t)
+            tensor_proto = load_proto(os.path.join(directory, '{}.pbuf'.format(t_hash)), proto_type=TensorProto)
+            if t != tensor_proto.name:
+                raise RuntimeError("Loaded the wrong tensor! Meant to load: {} did load: {} read file: {}".format(t, tensor.name, t_hash))
+            self.tensors[t] = tensor_proto_to_numpy_array(tensor_proto)
+
+    def save_model(self, directory):
+        os.makedirs(directory, exist_ok=True)
+
+        dump_proto(self.model_header, os.path.join(directory, 'ModelHeader.pbuf'))
+        dump_proto(self.extra_model_info, os.path.join(directory, 'ExtraModelInfo.pbuf'))
+
+        for k, v in self.tensors.items():
+            t_hash = hash_string(k)
+            proto = numpy_array_to_tensor_proto(v, k)
+            dump_proto(proto, os.path.join(directory, '{}.pbuf'.format(t_hash)))
+
+    def save_local_update(self, directory, result):
+        os.makedirs(directory, exist_ok=True)
+
+        t_hash = hash_string(result.task)
+        dump_proto(proto, os.path.join(directory, '{}.pbuf'.format(t_hash)))
+
+    def initialize_round_results(self):
+        self.round_results = RoundTaskResults(self.collaborator_common_names, self.tasks, self.logger)
 
     def update_config_from_filesystem(self):
         if self.runtime_aggregator_config_dir is None:
@@ -155,43 +174,16 @@ class Aggregator(object):
             return
 
         for k, v in config.items():
-            if k not in self.runtime_configurable_params:
+            if k == '_GRACEFULLY_QUIT':
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
+            elif k not in self.runtime_configurable_params:
                 self.logger.warning("Aggregator config file contains {}. This is not allowed by the flplan.".format(k))
             elif not hasattr(self, k):
                 self.logger.warning("Aggregator config file contains {}. This is not a valid aggregator parameter".format(k))
             else:
                 setattr(self, k, v)
                 self.logger.info("Aggregator config {} updated to {}".format(k, v))
-
-    def ensure_save_all_path_exists(self):
-        if self.save_all_models_path is None:
-            return
-
-        dir_path = os.path.join(self.save_all_models_path, str(self.federation_uuid), str(self.round_num))
-        os.makedirs(dir_path, exist_ok=True)
-        return dir_path
-
-    def save_aggregated_model(self):
-        if self.save_all_models_path is None:
-            return
-
-        dir_path = self.ensure_save_all_path_exists()
-
-        dump_proto(self.model, os.path.join(dir_path, "aggregated.pbuf"))
-
-    def save_local_update(self, collaborator, update):
-        if self.save_all_models_path is None:
-            return
-
-        # FIXME: better user experience would be good
-        # hash the collaborator name so we can ensure directory names are legal
-        md5 = hashlib.md5()
-        md5.update(collaborator.encode())
-        hashed_col = md5.hexdigest()[:8]
-
-        dir_path = self.ensure_save_all_path_exists()
-
-        dump_proto(update, os.path.join(dir_path, "{}.pbuf".format(hashed_col)))
 
     def valid_collaborator_CN_and_id(self, cert_common_name, collaborator_common_name):
         """Determine if the collaborator certificate and ID are valid for this federation.
@@ -210,6 +202,9 @@ class Aggregator(object):
         # otherwise, common_name must be in whitelist and collaborator_common_name must be in collaborator_common_names
         else:
             return cert_common_name == self.single_col_cert_common_name and collaborator_common_name in self.collaborator_common_names
+
+    def time_to_quit(self):
+        return self._do_quit or self.all_quit_jobs_sent()
 
     def all_quit_jobs_sent(self):
         """Determines if all collaborators have been sent the QUIT command.
@@ -240,39 +235,8 @@ class Aggregator(object):
         # check that we agree on single_col_cert_common_name
         check_equal(message.header.single_col_cert_common_name, self.single_col_cert_common_name, self.logger)
 
-    def init_per_col_round_stats(self):
-        """Initalize the metrics from collaborators for each round of aggregation. """
-        keys = ["loss_results", "collaborator_training_sizes", "agg_validation_results", "preagg_validation_results", "collaborator_validation_sizes"]
-        values = [{} for i in range(len(keys))]
-        self.per_col_round_stats = dict(zip(keys, values))
-
-    def collaborator_is_done(self, c):
-        """Determines if a collaborator is finished a round.
-
-        Args:
-            c: Collaborator name
-
-        Returns:
-            bool: True if collaborator c is done.
-
-        """
-        assert c in self.collaborator_common_names
-
-        # FIXME: this only works because we have fixed roles each round
-        return (c in self.per_col_round_stats["loss_results"] and
-                c in self.per_col_round_stats["collaborator_training_sizes"] and
-                c in self.per_col_round_stats["agg_validation_results"] and
-                c in self.per_col_round_stats["preagg_validation_results"] and
-                c in self.per_col_round_stats["collaborator_validation_sizes"])
-
-    def num_collaborators_done(self):
-        """Returns the number of collaborators that have finished the training round.
-
-        Returns:
-            int: The number of collaborators that have finished this round of training.
-
-        """
-        return sum([self.collaborator_is_done(c) for c in self.collaborator_common_names])
+        # check that we are using the same model
+        check_equal(message.header.model_header.id, self.model_header.id, self.logger)
 
     def straggler_time_expired(self):
         """Determines if there are still collaborators that have not returned past the expected round time.
@@ -289,7 +253,7 @@ class Aggregator(object):
             bool: True if the number of collaborators that have finished is greater than the minimum threshold set.
 
         """
-        return self.num_collaborators_done() >= self.minimum_reporting
+        return self.round_results.num_collaborators_done() >= self.minimum_reporting
 
     def straggler_cutoff_check(self):
         """Determines if we will end the round now, cutting off any remaining stragglers.
@@ -300,131 +264,67 @@ class Aggregator(object):
         """
         cutoff = self.straggler_time_expired() and self.minimum_collaborators_reported()
         if cutoff:
-            collaborators_done = [c for c in self.collaborator_common_names if self.collaborator_is_done(c)]
+            collaborators_done = self.round_results.num_collaborators_done()
             self.logger.info('\tEnding round early due to straggler cutoff. Collaborators done: {}'.format(collaborators_done))
         return cutoff
 
     def end_of_round_check(self):
-        """Determines if it is the end of a training round, if so calling method to perform end of round operations.
+        end_of_round = self.straggler_cutoff_check() or (self.round_results.num_collaborators_done() == len(self.collaborator_common_names))
 
-        Returns:
-            None
-
-        """
-        # FIXME: find a nice, clean way to manage these values without having to manually ensure
-        # the keys are in sync
-
-        # assert our dictionary keys are in sync
-        check_equal(self.per_col_round_stats["loss_results"].keys(), self.per_col_round_stats["collaborator_training_sizes"].keys(), self.logger)
-        check_equal(self.per_col_round_stats["agg_validation_results"].keys(), self.per_col_round_stats["collaborator_validation_sizes"].keys(), self.logger)
-
-        # if everyone is done OR our straggler policy calls for an early round end
-        if self.num_collaborators_done() == len(self.collaborator_common_names) or self.straggler_cutoff_check():
+        if end_of_round:
             self.end_of_round()
 
-    def get_weighted_average_of_collaborators(self, value_dict, weight_dict):
-        """Calculate the weighted average of data from the collaborators.
-
-        Args:
-            value_dict: A dictionary of the values (values can be dictionaries)
-            weight_dict: A dictionary of the collaborator weights (percentage of total data size)
-
-        Returns:
-            Dictionary containing weighted averages across collaborators
-
-        """
-        cols = [k for k in value_dict.keys() if k in self.collaborator_common_names]
-        # detect if our value dictionary has one or two levels,and if so get the second level keys
-        example_value = value_dict[cols[0]]
-        if isinstance(example_value, float):
-            averages = float(np.average([value_dict[c] for c in cols], weights=[weight_dict[c] for c in cols]))
-        else:
-            averages = {}
-            for key in example_value.keys():
-                averages[key] = float(np.average([value_dict[c][key] for c in cols], weights=[weight_dict[c] for c in cols])) 
-            
-        return averages
-
     def end_of_round(self):
-        """Runs required tasks when the training round has ended.
-        """
-        # FIXME: what all should we do to track results/metrics? It should really be an easy, extensible solution
+        # FIXME: proper logging of metrics
+        metrics_log_string = 'round results for model id/version {}/{}'.format(self.model_header.id, self.model_header.version) 
+        
+        # FIXME: dictionary handling is wonky
+        for metric in self.metrics_tasks:
+            r = self.round_results.task_results[metric]
+            if isinstance(r.value, dict):
+                metrics_log_string += '\n\t{}: total_samples: {}'.format(metric, r.weight)
+                for k, v in r.value.items():
+                    metrics_log_string += '\n\t\t{}: {}'.format(k, v)
+            else:
+                metrics_log_string += '\n\t{}: {}, total_samples: {}'.format(metric, r.value, r.weight)
+        self.logger.info(metrics_log_string)
 
-        # compute the weighted loss average
-        round_loss = self.get_weighted_average_of_collaborators(self.per_col_round_stats["loss_results"],
-                                                                self.per_col_round_stats["collaborator_training_sizes"])
+        # update the shared tensor values
+        for k in self.tensors.keys():
+            self.tensors[k] = self.round_results.get_tensor(k)
 
-        # compute the weighted validation average
-        round_val = self.get_weighted_average_of_collaborators(self.per_col_round_stats["agg_validation_results"],
-                                                                self.per_col_round_stats["collaborator_validation_sizes"])
+        # update our model header
+        self.model_header = ModelHeader(id=self.model_header.id,
+                                        version=self.model_header.version + 1)
 
-        # FIXME: is it correct to put this in the metadata?
-        self.metadata_for_round.update({'loss': round_loss, 'round_{}_validation'.format(self.round_num-1): round_val})
-
-        # FIXME: proper logging
-        self.logger.info('round results for model id/version {}/{}'.format(self.model.header.id, self.model.header.version))
-        self.logger.info('\tvalidation: {}'.format(round_val))
-        self.logger.info('\tloss: {}'.format(round_loss))
-
-        # construct the model protobuf from in progress tensors (with incremented version number)
-        self.set_model_to(construct_proto(tensor_dict=self.model_update_in_progress["tensor_dict"],
-                                          model_id=self.model.header.id,
-                                          model_version=self.model.header.version + 1,
-                                          is_delta=self.model_update_in_progress["is_delta"],
-                                          delta_from_version=self.model_update_in_progress["delta_from_version"],
-                                          compression_pipeline=self.compression_pipeline))
-
-        # add end of round metadata
-        self.metadata_for_round.update(self.get_end_of_round_metadata())
-
-        # add the metadata for this round to the total metadata file 
-        self.metadata['round {}'.format(self.round_num)] = self.metadata_for_round
-        self.metadata_for_round = {}
-
-        self.logger.info("Metadata:\n{}".format(yaml.dump(self.metadata)))
-
-        if self.latest_metadata_fname is not None:
-            with open(self.latest_metadata_fname, 'w') as f:
-                f.write(yaml.dump(self.metadata))
-            self.logger.info("Wrote metadata to {}".format(self.latest_metadata_fname))
-
-        # Save the new model as latest model.
-        dump_proto(self.model, self.latest_model_fpath)
+        # Save the new model as latest model
+        self.save_model(os.path.join(self.model_directory, 'latest'))
 
         # if configured, also save to the backup location
-        if self.save_all_models_path is not None:
-            self.save_aggregated_model()
+        if self.backup_path is not None:
+            self.save_model(os.join(self.backup_path, str(self.round_num)))
 
-        # in case that round_val is a dictionary (asuming one level only), basing best model on average of inner value
-        if isinstance(round_val, dict):
-            model_score = np.average(list(round_val.values()))
-        else:
-            model_score = round_val
+        # get the model score
+        model_score = self.round_results.task_results[self.best_model_metric].value
+
         if self.best_model_score is None or self.best_model_score < model_score:
             self.logger.info("Saved the best model with score {:f}.".format(model_score))
             self.best_model_score = model_score
             # Save a model proto version to file as current best model.
-            dump_proto(self.model, self.best_model_fpath)
-            self.aggregated_model_is_global_best = True
-        else:
-            self.aggregated_model_is_global_best = False
+            self.save_model(os.path.join(self.model_directory, 'best'))
 
-        # clear the update pointer
-        self.model_update_in_progress = None
+        # re-initialize our round results
+        self.initialize_round_results()
 
         # if we have enabled runtime configuration updates, do that now
         if self.runtime_aggregator_config_dir is not None:
             self.update_config_from_filesystem()
 
-        self.init_per_col_round_stats()
-
         self.round_num += 1
         self.logger.debug("Start a new round %d." % self.round_num)
         self.round_start_time = None
 
-    def set_model_to(self, model):
-        self.model = model
-        self.layers_in_model = [t.name for t in self.model.tensors]
+        self._do_quit = self._GRACEFULLY_QUIT
 
     def _synchronized(func):
         def wrapper(self, *args, **kwargs):
@@ -437,197 +337,88 @@ class Aggregator(object):
         return wrapper
 
     @_synchronized
-    def UploadLocalModelUpdate(self, message):
-        self.validate_header(message)
+    def UploadResults(self, message):
+        """Parses the collaborator reply message to get the collaborator results
 
-        tensor_name = message.tensor.name
+        Args:
+            message: Message from the collaborator
+
+        Returns:
+            The reply to the message (usually just the acknowledgement to the collaborator)
+
+        """
+        self.validate_header(message)
+        collaborator = message.header.sender
+        task = message.task
+
+        self.logger.debug("Received results for {} from {}".format(message.task, collaborator))
+     
+        # if this collaborator is out of date, we need to tell them to discard the remaining updates
+        if self.collaborator_out_of_sync(message.header.model_header):
+            self.logger.info("{} is out of sync. Replying with discard_round=True".format(collaborator))
+            return ResultsAck(header=self.create_reply_header(message), discard_round=True)
+
+        # if the collaborator has not already done this task, we aggregate and possibly also save
+        if not self.round_results.has_collaborator_done(collaborator, task):
+            # determine which of our oneofs is set
+            if message.WhichOneof("extra") == 'tensor':
+                value = tensor_proto_to_numpy_array(message.tensor)
+            elif message.WhichOneof("extra") == 'value_dict':
+                value = message.value_dict.dictionary
+            else:
+                value = message.value
+
+            self.round_results.update_from_collaborator(collaborator, task, value, message.weight)
+
+            # if the collaborator has not alread
+            if self.backup_path is not None:
+                self.save_local_update(os.path.join(self.backup_path, collaborator, str(self.round_num)), message)
+
+        reply = ResultsAck(header=self.create_reply_header(message), discard_round=False)
+
+        self.end_of_round_check()
+
+        return reply
+
+    def determine_next_job(self, message):
+        # get the collaborator who sent this message
         collaborator = message.header.sender
 
-        self.logger.info("Received tensor update {} from {}".format(tensor_name, collaborator))
-
-        # validate this model header
-        check_equal(message.model_header.id, self.model_header.id, self.logger)
-
-        # if this collaborator is out of date, we need to tell them to discard the remaining updates
-        if message.model_header.version < self.model_header.version:
-            self.logger.info("{} is out of date. Replying with discard_updates=True".format(collaborator))
-            return LocalTensorUpdateAck(header=self.create_reply_header(message), discard_updates=True)
-
-        # ensure we have a key for this collaborator
-        if collaborator not in self.per_col_received_tensors_this_round:
-            self.per_col_received_tensors_this_round[collaborator] = []
-
-        # only actually aggregate if this collaborator has not already sent this tensor
-        # The case could exist where a collaborator died half-way through sending all tensors, then retrained
-        # For now, we will accept the odd situation where we have updated different tensors according to different training runs.
-        if tensor_name not in self.per_col_received_tensors_this_round[collaborator]:
-            tensor = tensor_proto_to_numpy_array(message.tensor)
-            data_size = message.data_size
-
-            # if this is our very first update for this tensor this round, we take the tensor as-is
-            if self.tensor_updates_in_progress[tensor_name] is None:
-                self.tensor_updates_in_progress[tensor_name] = tensor
-                self.tensor_updates_in_progress_datasizes[tensor_name] = data_size
-            # otherwise, we compute the streaming weighted average
-            else:
-                # get the current update size total
-                total_size = self.tensor_updates_in_progress_datasizes[tensor_name]
-
-                # compute the weights for the global vs local tensors for our streaming average
-                weight_g = total_size / (total_size + data_size)
-                weight_l = data_size / (total_size + data_size)
-
-                # update the streaming average
-                tensors = [self.tensor_updates_in_progress[tensor_name], tensor]
-                self.tensor_updates_in_progress[tensor_name] = np.average(tensors, weights=[weight_g, weight_l], axis=0)
-
-                # update the total size
-                self.tensor_updates_in_progress_datasizes[tensor_name] += data_size
-
-            self.logger.info("Completed tensor update {} from {}".format(tensor_name, collaborator))
-
-            # TODO!!!!! End of round check here is maybe bad...
+        # FIXME: we should really have each collaborator validate one last time
+        # check if we are done
+        if self.collaborators_should_quit():
+            # we may need to send this again if the collaborator process has been restarted for some reason
+            # thus we may not need to add it to the list again
+            if message.header.sender not in self.quit_job_sent_to:
+                self.quit_job_sent_to.append(collaborator)        
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_QUIT)
+            
+        # FIXME: this flow needs to depend on a job selection output for the round
+        # for now, all jobs require an in-sync model, so it is the first check
+        # check if the sender model is out of date
+        if self.collaborator_out_of_sync(message.header.model_header):
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_DOWNLOAD_MODEL,
+                            extra_model_info=self.extra_model_info)
+        
+        # the collaborator has the shared model, so now determine what the next upload should be
+        next_upload = self.next_collaborator_upload(collaborator)
+        if next_upload is not None:
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_UPLOAD_RESULTS,
+                            name=next_upload)
+        # otherwise, the collaborator is done
         else:
-            self.logger.info("Ingoring tensor update {} from {}".format(tensor_name, collaborator))            
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_SLEEP,
+                            seconds=self.collaborator_sleep_time)
 
-        return LocalTensorUpdateAck(header=self.create_reply_header(message), discard_updates=False)
-
-    @_synchronized
-    def UploadLocalModelUpdate(self, message):
-        """Parses the collaborator reply message to get the collaborator model update
-
-        Args:
-            message: Message from the collaborator
-
-        Returns:
-            The reply to the message (usually just the acknowledgement to the collaborator)
-
-        """
-        t = time.time()
-        self.validate_header(message)
-
-        self.logger.info("Receive model update from %s " % message.header.sender)
-
-        # Get the model parameters from the model proto and additional model info
-        model_tensors = deconstruct_proto(model_proto=message.model, compression_pipeline=self.compression_pipeline)
-        is_delta = message.model.header.is_delta
-        delta_from_version = message.model.header.delta_from_version
-
-        # validate this model header
-        check_equal(message.model.header.id, self.model.header.id, self.logger)
-        check_equal(message.model.header.version, self.model.header.version, self.logger)
-
-        # ensure we haven't received an update from this collaborator already
-        check_not_in(message.header.sender, self.per_col_round_stats["loss_results"], self.logger)
-        check_not_in(message.header.sender, self.per_col_round_stats["collaborator_training_sizes"], self.logger)
-
-        # dump the local update, if necessary
-        if self.save_all_models_path is not None:
-            self.save_local_update(message.header.sender, message.model)
-
-        # if this is our very first update for the round, we take these model tensors as-is
-        # FIXME: move to model deltas, add with original to reconstruct
-        # FIXME: this really only works with a trusted collaborator. Sanity check this against self.model
-        if self.model_update_in_progress is None:
-            self.model_update_in_progress = {"tensor_dict": model_tensors,
-                                                "is_delta": is_delta,
-                                                "delta_from_version": delta_from_version}
-
-        # otherwise, we compute the streaming weighted average
-        else:
-            # get the current update size total
-            total_update_size = np.sum(list(self.per_col_round_stats["collaborator_training_sizes"].values()))
-
-            # compute the weights for the global vs local tensors for our streaming average
-            weight_g = total_update_size / (message.data_size + total_update_size)
-            weight_l = message.data_size / (message.data_size + total_update_size)
-
-            # The model parameters are represented in float32 and will be transmitted in byte stream.
-            weight_g = weight_g.astype(np.float32)
-            weight_l = weight_l.astype(np.float32)
-
-            # FIXME: right now we're really using names just to sanity check consistent ordering
-
-            # check that the models include the same number of tensors, and that whether or not
-            # it is a delta and from what version is the same
-            check_equal(len(self.model_update_in_progress["tensor_dict"]), len(model_tensors), self.logger)
-            check_equal(self.model_update_in_progress["is_delta"], is_delta, self.logger)
-            check_equal(self.model_update_in_progress["delta_from_version"], delta_from_version, self.logger)
-
-            # aggregate all the model tensors in the tensor_dict
-            # (weighted average of local update l and global tensor g for all l, g)
-            for name, l in model_tensors.items():
-                g = self.model_update_in_progress["tensor_dict"][name]
-                # check that g and l have the same shape
-                check_equal(g.shape, l.shape, self.logger)
-
-                # now store a weighted average into the update in progress
-                self.model_update_in_progress["tensor_dict"][name] = np.average([g, l], weights=[weight_g, weight_l], axis=0)
-
-        # store the loss results and training update size
-        self.per_col_round_stats["loss_results"][message.header.sender] = message.loss
-        self.per_col_round_stats["collaborator_training_sizes"][message.header.sender] = message.data_size
-
-        # return LocalModelUpdateAck
-        self.logger.debug("Complete model update from %s " % message.header.sender)
-        reply = LocalModelUpdateAck(header=self.create_reply_header(message))
-
-        self.end_of_round_check()
-
-        self.logger.debug('aggregator handled UploadLocalModelUpdate in time {}'.format(time.time() - t))
-
-        return reply
-
-    def collaborator_has_trained(self, collaborator):
-        return collaborator in self.per_col_round_stats["collaborator_training_sizes"]
-
-    @_synchronized
-    def UploadLocalMetricsUpdate(self, message):
-        """Parses the collaborator reply message to get the collaborator metrics (usually the local validation score)
-
-        Args:
-            message: Message from the collaborator
-
-        Returns:
-            The reply to the message (usually just the acknowledgement to the collaborator)
-
-        """
-        t = time.time()
-        self.validate_header(message)
-
-        self.logger.debug("Receive local validation results from %s " % message.header.sender)
-        model_header = message.model_header
-
-        # validate this model header
-        check_equal(model_header.id, self.model.header.id, self.logger)
-        check_equal(model_header.version, self.model.header.version, self.logger)
-
-        sender = message.header.sender
-
-        if sender not in self.per_col_round_stats["agg_validation_results"]:
-            # Pre-train validation
-            # ensure we haven't received an update from this collaborator already
-            # FIXME: is this an error case that should be handled?
-            check_not_in(message.header.sender, self.per_col_round_stats["agg_validation_results"], self.logger)
-            check_not_in(message.header.sender, self.per_col_round_stats["collaborator_validation_sizes"], self.logger)
-
-            # store the validation results and validation size
-            self.per_col_round_stats["agg_validation_results"][message.header.sender] = message.results
-            self.per_col_round_stats["collaborator_validation_sizes"][message.header.sender] = message.data_size
-        elif sender not in self.per_col_round_stats["preagg_validation_results"]:
-            # Post-train validation
-            check_not_in(message.header.sender, self.per_col_round_stats["preagg_validation_results"], self.logger)
-            self.per_col_round_stats["preagg_validation_results"][message.header.sender] = message.results
-
-        reply = LocalValidationResultsAck(header=self.create_reply_header(message))
-
-        self.end_of_round_check()
-
-        self.logger.debug('aggregator handled UploadLocalMetricsUpdate in time {}'.format(time.time() - t))
-
-        self.logger.debug('aggregator handled UploadLocalMetricsUpdate in time {}'.format(time.time() - t))
-
-        return reply
+    def next_collaborator_upload(self, collaborator):
+        for task in self.tasks:
+            if not self.round_results.has_collaborator_done(collaborator, task):
+                return task
+        return None
 
     @_synchronized
     def RequestJob(self, message):
@@ -640,63 +431,18 @@ class Aggregator(object):
             The reply to the message (usually just the acknowledgement to the collaborator)
 
         """
-
-        t = time.time()
         self.validate_header(message)
-
-        # extra info for job reply
-        extra = ""
-
-        # get the collaborator who sent this message
         collaborator = message.header.sender
-
-        if 
-            job = JOB_QUIT
-            if collaborator not in self.quit_job_sent_to:
-                self.quit_job_sent_to.append(collaborator)
         
+        reply = self.determine_next_job(message)
 
-        # FIXME: we should really have each collaborator validate one last time
-        # check if we are done
-        if self.collaborators_should_quit():
-            job = JOB_QUIT
+        self.logger.debug("Receive job request from %s and assign with %s" % (collaborator, Job.Name(reply.job)))
 
-            # we may need to send this again if the collaborator process has been restarted for some reason
-            # thus we may not need to add it to the list again
-            if message.header.sender not in self.quit_job_sent_to:
-                self.quit_job_sent_to.append(collaborator)
-        # FIXME: this flow needs to depend on a job selection output for the round
-        # for now, all jobs require an in-sync model, so it is the first check
-        # check if the sender model is out of date
-        elif self.collaborator_out_of_date(message.model_header):
-            job = JOB_DOWNLOAD_MODEL
-            self.reset_collaborator_results_for_current_round(collaborator)
-        # else, check if this collaborator has not sent validation results
-        elif collaborator not in self.per_col_round_stats["agg_validation_results"]:
-            job = JOB_VALIDATE
-        # else, check if this collaborator has not sent training results
-        elif not self.collaborator_has_trained(collaborator):
-            job = JOB_TRAIN
-        # else, see if we still need layer updates
-        elif self.collaborator_next_layer_needed(collaborator) is not None:
-            job = JOB_UPLOAD_LAYER
-            extra = self.collaborator_next_layer_needed(collaborator)
-        elif collaborator not in self.per_col_round_stats["preagg_validation_results"]:
-            job = JOB_VALIDATE
-        # else this collaborator is done for the round
-        else:
-            job = JOB_YIELD
-
-        self.logger.debug("Receive job request from %s and assign with %s (extra: %s)" % (collaborator, job, extra))
-
-        reply = JobReply(header=self.create_reply_header(message), job=job)
-
-        if reply.job is not JOB_YIELD:
+        if reply.job is not JOB_SLEEP:
             # check to see if we need to set our round start time
             if self.round_start_time is None:
                 self.round_start_time = time.time()
-            
-            self.logger.debug('aggregator handled RequestJob in time {}'.format(time.time() - t))
+
         elif self.straggler_cutoff_time != np.inf:
             # we have an idle collaborator and a straggler cutoff time, so we should check for early round end
             self.end_of_round_check()
@@ -704,59 +450,28 @@ class Aggregator(object):
         return reply
 
     @_synchronized
-    def DownloadModelInfo(self, message):
-        """Sends the model header, tensor names, and metadata to the collaborator
-
-        Args:
-            message: Message from the collaborator
-
-        Returns:
-            The reply to the message (a ModelInfo)
-
-        """
-        self.validate_header(message)
-        self.logger.info("Received DownloadModelInfo request from %s " % message.header.sender)
-
-        metadata_yaml = None
-        if self.send_metadata_to_clients:
-            metadata_yaml = yaml.dump(self.metadata)
-
-        reply = ModelInfo(header=self.create_reply_header(message),
-                          model_header=self.model.header,
-                          tensor_names=self.model_tensor_names,
-                          is_global_best=self.aggregated_model_is_global_best,
-                          metadata_yaml=metadata_yaml)
-
-        self.logger.debug("Completed preparing DownloadModelInfo reply for %s. Sending." % message.header.sender)
-
-        return reply
-
-
-    @_synchronized
-    def DownloadGlobalTensor(self, message):
+    def DownloadTensor(self, message):
         """Sends a tensor to the collaborator
 
         Args:
             message: Message from the collaborator
 
         Returns:
-            A GlobalTensorUpdate
+            A GlobalTensor
 
         """
         self.validate_header(message)
-        self.logger.info("Received DownloadGlobalTensor request from %s " % message.header.sender)
 
-        if message.tensor_name not in self.model_tensors:
+        self.logger.debug("Received DownloadTensor request from {} for {}".format(message.header.sender, message.tensor_name))
+
+        if message.tensor_name not in self.tensors:
             raise RuntimeError("Requested tensor {} from {} not in our list of tensors!".format(message.tensor_name, message.header.sender))
 
-        tensor_proto = numpy_array_to_tensor_proto(self.model_tensors[message.tensor_name],
+        tensor_proto = numpy_array_to_tensor_proto(self.tensors[message.tensor_name],
                                                    message.tensor_name)
 
-        reply = GlobalTensorUpdate(header=self.create_reply_header(message),
-                                   model_header=self.model_header,
-                                   tensor=tensor_proto)
-
-        self.logger.debug("Completed preparing GlobalTensorUpdate reply for %s. Sending." % message.header.sender)
+        reply = GlobalTensor(header=self.create_reply_header(message),
+                             tensor=tensor_proto)
 
         return reply
 
@@ -773,10 +488,15 @@ class Aggregator(object):
             The message header.
 
         """
-        return MessageHeader(sender=self.uuid, recipient=message.header.sender, federation_id=self.federation_uuid, counter=message.header.counter, single_col_cert_common_name=self.single_col_cert_common_name)
+        return MessageHeader(sender=self.uuid,
+                             recipient=message.header.sender,
+                             federation_id=self.federation_uuid,
+                             counter=message.header.counter,
+                             single_col_cert_common_name=self.single_col_cert_common_name,
+                             model_header=self.model_header)
 
-    def collaborator_out_of_date(self, model_header):
-        """Determines if the collaborator has the wrong version of the model (aka out of date)
+    def collaborator_out_of_sync(self, model_header):
+        """Determines if the collaborator has the wrong version of the model (aka out of sync)
 
         Args:
             model_header: Header for the model
@@ -786,35 +506,86 @@ class Aggregator(object):
 
         """
         # validate that this is the right model to be checking
-        check_equal(model_header.id, self.model.header.id, self.logger)
+        check_equal(model_header.id, self.model_header.id, self.logger)
 
-        return model_header.version != self.model.header.version
+        return model_header.version != self.model_header.version
 
     def log_big_warning(self):
         self.logger.warning("\n{}\nYOU ARE RUNNING IN SINGLE COLLABORATOR CERT MODE! THIS IS NOT PROPER PKI AND SHOULD ONLY BE USED IN DEVELOPMENT SETTINGS!!!! YE HAVE BEEN WARNED!!!".format(the_dragon))
 
-    def get_end_of_round_metadata(self):
-        metadata = {}
+
+# this holds the streaming average results for the tasks, including both metrics and scalars
+class RoundTaskResults(object):
+    def __init__(self, collaborators, tasks, logger):
+        self.collaborators = collaborators
+        self.tasks = tasks
+        self.logger = logger
+        # FIXME: This has all collaborators do all tasks for a round
+        self.task_results = {t: StreamingAverage(t, logger) for t in tasks}
+
+    def has_collaborator_done(self, collaborator, task):
+        return self.task_results[task].has_collaborator_done(collaborator)
+
+    def is_collaborator_done_for_round(self, collaborator):
+        for task in self.tasks:
+            if not self.has_collaborator_done(collaborator, task):
+                return False
+        return True
+
+    def num_collaborators_done(self):
+        return sum([self.is_collaborator_done_for_round(c) for c in self.collaborators])
+
+    def is_task_done_for_round(self, task):
+        for collaborator in self.collaborators:
+            if not self.has_collaborator_done(collaborator, task):
+                return False
+        return True
+
+    def update_from_collaborator(self, collaborator, task, value, weight):
+        self.task_results[task].update_from_collaborator(collaborator, value, weight)
+    
+    def get_tensor(self, tensor_name):
+        value = self.task_results[tensor_name].value
+        if not isinstance(value, np.ndarray):
+            raise RuntimeError("Tensor {} is not an ndarray!".format(tensor_name))
+        return value
+
+# stores the streaming average of an aggregated value during a round
+class StreamingAverage(object):
+
+    def __init__(self, name, logger):
+        self.name = name
+        self.value = None
+        self.weight = None
+        self.updated_by = []
+        self.logger = logger
+
+    def has_collaborator_done(self, collaborator):
+        return collaborator in self.updated_by
+    
+    def update_from_collaborator(self, collaborator, value, weight):
+        if self.has_collaborator_done(collaborator):
+            return
+
+        self.updated_by.append(collaborator)
+        if self.value is None:
+            self.value = value
+            self.weight = weight
+        else:
+            # if a dictionary, we need to update each separately
+            if isinstance(self.value, dict):
+                for k, v in self.value:
+                    self.value[k] = self.weighted_average([v, value[k]], [self.weight, weight])
+            else:
+                self.value = self.weighted_average([self.value, value], [self.weight, weight])
+            self.weight += weight
+
+    def weighted_average(self, values, weights):
+        axis = None
+        if isinstance(values[0], np.ndarray):
+            axis = 0
+        return np.average(values, weights=weights, axis=axis)
         
-        # if no metadata to get, return empty dict
-        if self.end_of_round_metadata is None:
-            return metadata
-        
-        # otherwise, iterate through list of function calls
-        for func_name in self.end_of_round_metadata:
-            try:
-                func = getattr(self, func_name)
-                metadata[func_name] = func()
-            except AttributeError as e:
-                self.logger.critical("Aggregator unable to compute metadata: no Aggregator function called {}. Check the flplan/aggregator_object_init/init_kwargs/end_of_round_metadata list for this name. It may be misspelled".format(func_name))
-        return metadata
-
-    def aggregation_time(self):
-        return time.time()
-
-    def participant_training_data_size(self):
-        return sum(list(self.per_col_round_stats["collaborator_training_sizes"].values()))
-
 
 the_dragon = """
 
