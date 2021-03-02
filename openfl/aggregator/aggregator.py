@@ -438,7 +438,11 @@ class Aggregator(object):
         
         reply = self.determine_next_job(message)
 
-        self.logger.debug("Receive job request from %s and assign with %s" % (collaborator, Job.Name(reply.job)))
+        # we log download jobs as info, others as debug
+        if reply.job is JOB_DOWNLOAD_MODEL:
+            self.logger.info("Receive job request from %s and assign with %s" % (collaborator, Job.Name(reply.job)))
+        else:
+            self.logger.debug("Receive job request from %s and assign with %s" % (collaborator, Job.Name(reply.job)))
 
         if reply.job is not JOB_SLEEP:
             # check to see if we need to set our round start time

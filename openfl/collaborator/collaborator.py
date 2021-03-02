@@ -212,7 +212,7 @@ class Collaborator(object):
 
         """
 
-        self.logger.info("Collaborator [%s] connects to federation [%s] and aggegator [%s]." % (self.common_name, self.federation_uuid, self.aggregator_uuid))
+        self.logger.debug("Collaborator [%s] connects to federation [%s] and aggegator [%s]." % (self.common_name, self.federation_uuid, self.aggregator_uuid))
         self.logger.debug("The optimizer variable treatment is [%s]." % self.opt_treatment)
         while True:
             # query for job and validate it
