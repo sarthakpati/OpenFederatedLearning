@@ -81,6 +81,7 @@ class Collaborator(object):
         self.channel = channel
         self.num_retries = num_retries
         self.polling_interval = 10
+        self.print_sleep_job = True
 
         # this stuff is really about sanity/correctness checking to ensure the bookkeeping and control flow is correct
         self.common_name = collaborator_common_name
@@ -220,6 +221,9 @@ class Collaborator(object):
             check_type(reply, JobReply, self.logger)
             job = reply.job
 
+            if job is not JOB_SLEEP:
+                self.print_sleep_job = True
+
             self.logger.debug("%s - Got a job %s" % (self, Job.Name(job)))
 
             if job is JOB_DOWNLOAD_MODEL:
@@ -228,6 +232,9 @@ class Collaborator(object):
                 self.do_upload_results_job(reply.name)
             elif job is JOB_SLEEP:
                 self.polling_interval = reply.seconds
+                if self.print_sleep_job:
+                    self.logger.info("{} got sleep job for {} seconds".format(self, self.polling_interval))
+                    self.print_sleep_job = False
                 return False
             elif job is JOB_QUIT:
                 return True
@@ -317,13 +324,13 @@ class Collaborator(object):
             batches_per_epoch = int(np.ceil(data_size/self.wrapped_model.data.batch_size))
             num_batches = int(np.floor(batches_per_epoch * self.epochs_per_round))
 
-        self.logger.debug("{} Begun training {} batches.".format(self, num_batches))
+        self.logger.info("{} Begun training {} batches.".format(self, num_batches))
 
         train_info = self.wrapped_model.train_batches(num_batches=num_batches)
 
         self.local_model_has_been_trained = True
 
-        self.logger.debug("{} Completed training {} batches.".format(self, num_batches))
+        self.logger.info("{} Completed training {} batches.".format(self, num_batches))
 
         # allowing extra information regarding training to be logged (for now none of the extra info is sent to the aggregator)
         if isinstance(train_info, dict):
@@ -348,9 +355,9 @@ class Collaborator(object):
 
         Runs the validation of the model on the local dataset.
         """
-        self.logger.debug("{} - Beginning {}".format(self, result_name))
+        self.logger.info("{} - Beginning {}".format(self, result_name))
         results = self.wrapped_model.validate()
-        self.logger.debug("{} - Completed {}".format(self, result_name))
+        self.logger.info("{} - Completed {}".format(self, result_name))
         data_size = self.wrapped_model.get_validation_data_size()
 
         self.round_results[result_name] = (results, data_size)
