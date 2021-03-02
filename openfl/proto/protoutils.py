@@ -12,7 +12,7 @@
 # limitations under the License.
 
 import numpy as np
-from openfl.proto.collaborator_aggregator_interface_pb2 import TensorProto, DataStream
+from openfl.proto.collaborator_aggregator_interface_pb2 import TensorProto, DataStream, LegacyModelProto
 
 def tensor_proto_to_numpy_array(tensor_proto):
     return np.frombuffer(tensor_proto.data_bytes, dtype=np.float32).reshape(tuple(tensor_proto.shape))
@@ -89,3 +89,17 @@ def proto_to_datastream(proto, logger, max_buffer_size=(256 * 1024)):
         chunk = npbytes[i : i + buffer_size]
         reply = DataStream(npbytes=chunk, size=len(chunk))
         yield reply
+
+def load_legacy_model_protobuf(file_path):
+    model_proto = load_proto(
+        file_path,
+        LegacyModelProto)
+
+    tensor_dict = {}
+    for t in model_proto.tensors:
+        if len(t.transformer_metadata) != 1:
+            raise NotImplementedError("Legacy support for compressed models is not yet implemented")
+        shape = t.transformer_metadata[0].int_list
+        tensor_dict[t.name] = np.frombuffer(t.data_bytes, dtype=np.float32).reshape(tuple(shape))
+
+    return tensor_dict

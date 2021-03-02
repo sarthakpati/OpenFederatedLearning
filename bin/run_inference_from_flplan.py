@@ -21,8 +21,7 @@ import importlib
 
 from openfl import split_tensor_dict_for_holdouts
 from openfl.models import InferenceOnlyModelWrapper
-from openfl.tensor_transformation_pipelines import NoCompressionPipeline
-from openfl.proto.protoutils import deconstruct_proto, load_proto
+from openfl.proto.protoutils import load_legacy_model_protobuf, load_proto
 from openfl.flplan import create_data_object_with_explicit_data_path, parse_fl_plan, create_model_object
 from setup_logging import setup_logging
 
@@ -105,8 +104,7 @@ def main(plan, model_weights_filename, native_model_weights_filepath, populate_w
         # if pbuf weights, we need to run deconstruct proto with a NoCompression pipeline
         if model_weights_filename is not None:        
             proto_path = os.path.join(base_dir, 'weights', model_weights_filename)
-            proto = load_proto(proto_path)
-            tensor_dict_from_proto = deconstruct_proto(proto, NoCompressionPipeline())
+            tensor_dict_from_proto = load_legacy_model_protobuf(proto_path)
 
             # restore any tensors held out from the proto
             _, holdout_tensors = remove_and_save_holdout_tensors(model.get_tensor_dict())        
