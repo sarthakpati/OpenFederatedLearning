@@ -280,7 +280,13 @@ class Collaborator(object):
                                     task=task,
                                     value=result)
 
-        self._request_with_retries(request, upload=True)
+        # we do not crash on exception, but instead abort the job
+        try:
+            reply = self.channel.UploadResults(request)
+            self.validate_header(reply)
+        except Exception as e:
+            self.logger.info("Upload failed with exception:")
+            self.logger.exception(repr(e))
 
     def do_task(self, task):
         # FIXME: this should really not be hard-coded
@@ -362,25 +368,19 @@ class Collaborator(object):
 
         self.round_results[result_name] = (results, data_size)
 
-    def _request_with_retries(self, request, upload=False):
+    def _download_with_retries(self, request):
         # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
         # an exception can happen in cases where we simply need to retry
+        reply = None
         for i in range(self.num_retries):
             try:
-                if upload:
-                    reply = self.channel.UploadResults(request)
-                else:
-                    reply = self.channel.DownloadTensor(request)
+                reply = self.channel.DownloadTensor(request)
+                self.validate_header(reply)
                 break
             except Exception as e:
                 self.logger.exception(repr(e))
-                # if final retry, raise exception
-                if i + 1 == self.num_retries:
-                    raise e
-                else:
-                    self.logger.warning("Retrying {}. Try {} of {}".format(request.__class__.__name__, i+1, self.num_retries))
+                self.logger.warning("Failed download attempt {} of {}".format(i+1, self.num_retries))
         
-        self.validate_header(reply)
         return reply
 
     def do_download_model_job(self, tensor_names):
@@ -399,7 +399,10 @@ class Collaborator(object):
         downloaded_tensors = {}
         for tensor_name in tensor_names:
             request = TensorDownloadRequest(header=self.create_message_header(), tensor_name=tensor_name)
-            global_tensor = self._request_with_retries(request, upload=False)
+            global_tensor = self._download_with_retries(request)
+            # if none, we have failed 5 consecutive attempts and should abort the job
+            if global_tensor is None:
+                return
 
             # if this is our first tensor downloaded, we set first version
             if new_model_header is None:
