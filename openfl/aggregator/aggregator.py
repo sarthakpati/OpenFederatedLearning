@@ -396,7 +396,14 @@ class Aggregator(object):
                 self.quit_job_sent_to.append(collaborator)        
             return JobReply(header=self.create_reply_header(message),
                             job=JOB_QUIT)
-            
+
+        # if _do_quit is set, we should tell them to sleep
+        # this occurs because the server has not yet actually quit
+        if self._do_quit:
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_SLEEP,
+                            seconds=self.collaborator_sleep_time)
+
         # FIXME: this flow needs to depend on a job selection output for the round
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
