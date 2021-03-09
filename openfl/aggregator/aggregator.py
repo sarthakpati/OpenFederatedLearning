@@ -90,6 +90,9 @@ class Aggregator(object):
         self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
         self.runtime_configurable_params = runtime_configurable_params
 
+        self._GRACEFULLY_QUIT = False
+        self.best_model_metric = best_model_metric
+
         if self.runtime_aggregator_config_dir is not None:
             self.update_config_from_filesystem()
 
@@ -103,12 +106,10 @@ class Aggregator(object):
 
         self.round_num = self.model_header.version + 1
 
-        self._GRACEFULLY_QUIT = False
         self._do_quit = False
 
         self.initialize_round_results()
         self.best_model_score = None
-        self.best_model_metric = best_model_metric
         self.mutex = Lock()
 
     def create_task_list(self):
