@@ -90,6 +90,9 @@ class Aggregator(object):
         self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
         self.runtime_configurable_params = runtime_configurable_params
 
+        self._GRACEFULLY_QUIT = False
+        self.best_model_metric = best_model_metric
+
         if self.runtime_aggregator_config_dir is not None:
             self.update_config_from_filesystem()
 
@@ -103,12 +106,10 @@ class Aggregator(object):
 
         self.round_num = self.model_header.version + 1
 
-        self._GRACEFULLY_QUIT = False
         self._do_quit = False
 
         self.initialize_round_results()
         self.best_model_score = None
-        self.best_model_metric = best_model_metric
         self.mutex = Lock()
 
     def create_task_list(self):
@@ -395,7 +396,14 @@ class Aggregator(object):
                 self.quit_job_sent_to.append(collaborator)        
             return JobReply(header=self.create_reply_header(message),
                             job=JOB_QUIT)
-            
+
+        # if _do_quit is set, we should tell them to sleep
+        # this occurs because the server has not yet actually quit
+        if self._do_quit:
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_SLEEP,
+                            seconds=self.collaborator_sleep_time)
+
         # FIXME: this flow needs to depend on a job selection output for the round
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
