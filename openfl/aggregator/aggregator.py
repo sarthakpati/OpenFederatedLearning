@@ -152,7 +152,7 @@ class Aggregator(object):
         dump_proto(proto, os.path.join(directory, '{}.pbuf'.format(t_hash)))
 
     def initialize_round_results(self):
-        self.round_results = RoundTaskResults(self.collaborator_common_names, self.tasks, self.logger)
+        self.round_results = RoundTaskResults(self.collaborator_common_names, self.tasks, self.logger, self.metrics_tasks)
 
     def update_config_from_filesystem(self):
         if self.runtime_aggregator_config_dir is None:
@@ -530,10 +530,11 @@ class Aggregator(object):
 
 # this holds the streaming average results for the tasks, including both metrics and scalars
 class RoundTaskResults(object):
-    def __init__(self, collaborators, tasks, logger):
+    def __init__(self, collaborators, tasks, logger, log_these=None):
         self.collaborators = collaborators
         self.tasks = tasks
         self.logger = logger
+        self.log_these = log_these
         # FIXME: This has all collaborators do all tasks for a round
         self.task_results = {t: StreamingAverage(t, logger) for t in tasks}
 
@@ -556,6 +557,8 @@ class RoundTaskResults(object):
         return True
 
     def update_from_collaborator(self, collaborator, task, value, weight):
+        if self.log_these is not None and self.logger is not None and task in self.log_these:
+            self.logger.info("Received update from {} for {} with value {} and weight {}".format(collaborator, task, value, weight))
         self.task_results[task].update_from_collaborator(collaborator, value, weight)
     
     def get_tensor(self, tensor_name):
