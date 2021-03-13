@@ -68,7 +68,7 @@ class Aggregator(object):
                  send_metadata_to_clients=False,
                  backup_path=None,
                  runtime_aggregator_config_dir=None,
-                 runtime_configurable_params=None,
+                 runtime_configurable_params=[],
                  collaborator_sleep_time=10,
                  best_model_metric='shared_model_validation',
                  **kwargs):
@@ -92,6 +92,7 @@ class Aggregator(object):
 
         self._GRACEFULLY_QUIT = False
         self.best_model_metric = best_model_metric
+        self.ignore_list = []
 
         if self.runtime_aggregator_config_dir is not None:
             self.update_config_from_filesystem()
@@ -158,9 +159,6 @@ class Aggregator(object):
         if self.runtime_aggregator_config_dir is None:
             return
 
-        if self.runtime_configurable_params is None:
-            return
-
         # make the directory for convenience
         config_dir = os.path.join(self.runtime_aggregator_config_dir, self.federation_uuid)
         os.makedirs(config_dir, exist_ok=True)
@@ -174,8 +172,15 @@ class Aggregator(object):
             self.logger.info("Aggregator did not find config file: {}".format(config_file))
             return
 
+        # if "ignore_list" is not present, reset it to empty
+        if 'ignore_list' not in config:
+            self.ignore_list = []
+
         for k, v in config.items():
             if k == '_GRACEFULLY_QUIT':
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
+            elif k == 'ignore_list':
                 setattr(self, k, v)
                 self.logger.info("Aggregator config {} updated to {}".format(k, v))
             elif k not in self.runtime_configurable_params:
@@ -400,6 +405,12 @@ class Aggregator(object):
         # if _do_quit is set, we should tell them to sleep
         # this occurs because the server has not yet actually quit
         if self._do_quit:
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_SLEEP,
+                            seconds=self.collaborator_sleep_time)
+
+        # if this collaborator is in the ignore list, tell them to sleep
+        if collaborator in self.ignore_list:
             return JobReply(header=self.create_reply_header(message),
                             job=JOB_SLEEP,
                             seconds=self.collaborator_sleep_time)
