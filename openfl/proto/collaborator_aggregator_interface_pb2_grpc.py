@@ -31,6 +31,11 @@ class AggregatorStub(object):
                 request_serializer=collaborator__aggregator__interface__pb2.DataStream.SerializeToString,
                 response_deserializer=collaborator__aggregator__interface__pb2.ResultsAck.FromString,
                 )
+        self.DownloadRoundSummary = channel.unary_unary(
+                '/openfl_proto.Aggregator/DownloadRoundSummary',
+                request_serializer=collaborator__aggregator__interface__pb2.RoundSummaryDownloadRequest.SerializeToString,
+                response_deserializer=collaborator__aggregator__interface__pb2.RoundSummary.FromString,
+                )
 
 
 class AggregatorServicer(object):
@@ -57,6 +62,12 @@ class AggregatorServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DownloadRoundSummary(self, request, context):
+        """Missing associated documentation comment in .proto file"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AggregatorServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -74,6 +85,11 @@ def add_AggregatorServicer_to_server(servicer, server):
                     servicer.UploadResults,
                     request_deserializer=collaborator__aggregator__interface__pb2.DataStream.FromString,
                     response_serializer=collaborator__aggregator__interface__pb2.ResultsAck.SerializeToString,
+            ),
+            'DownloadRoundSummary': grpc.unary_unary_rpc_method_handler(
+                    servicer.DownloadRoundSummary,
+                    request_deserializer=collaborator__aggregator__interface__pb2.RoundSummaryDownloadRequest.FromString,
+                    response_serializer=collaborator__aggregator__interface__pb2.RoundSummary.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -133,5 +149,21 @@ class Aggregator(object):
         return grpc.experimental.stream_unary(request_iterator, target, '/openfl_proto.Aggregator/UploadResults',
             collaborator__aggregator__interface__pb2.DataStream.SerializeToString,
             collaborator__aggregator__interface__pb2.ResultsAck.FromString,
+            options, channel_credentials,
+            call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def DownloadRoundSummary(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/openfl_proto.Aggregator/DownloadRoundSummary',
+            collaborator__aggregator__interface__pb2.RoundSummaryDownloadRequest.SerializeToString,
+            collaborator__aggregator__interface__pb2.RoundSummary.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)

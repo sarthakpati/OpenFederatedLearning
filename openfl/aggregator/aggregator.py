@@ -23,7 +23,7 @@ from threading import Lock
 
 from .. import check_equal, check_not_equal, check_is_in, check_not_in, load_yaml, hash_string
 from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ModelHeader, TensorProto
-from ..proto.collaborator_aggregator_interface_pb2 import GlobalTensor, JobReply, ResultsAck, ExtraModelInfo
+from ..proto.collaborator_aggregator_interface_pb2 import GlobalTensor, JobReply, ResultsAck, ExtraModelInfo, RoundSummary
 from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest
 from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
 from openfl.proto.protoutils import dump_proto, load_proto, tensor_proto_to_numpy_array, numpy_array_to_tensor_proto
@@ -106,6 +106,8 @@ class Aggregator(object):
         self.load_model(os.path.join(model_directory, initial_model))
 
         self.round_num = self.model_header.version + 1
+
+        self.round_summary = 'start of federation'
 
         self._do_quit = False
 
@@ -321,6 +323,19 @@ class Aggregator(object):
             # Save a model proto version to file as current best model.
             self.save_model(os.path.join(self.model_directory, 'best'))
 
+        # create the collaborator round metrics
+        self.round_summary = {
+            'round': self.round_num,
+            'round_start': self.round_start_time,
+            ''
+        }
+        for k in self.metrics_tasks:
+            round_result = self.round_results[k]
+            result_weight = round_result.weight
+            if isinstance(self.value, dict):
+            # FIXME: hack only supports dictionaries one level deep
+            self.round_summary[k] = self.round_results[k]
+
         # re-initialize our round results
         self.initialize_round_results()
 
@@ -440,6 +455,13 @@ class Aggregator(object):
             if not self.round_results.has_collaborator_done(collaborator, task):
                 return task
         return None
+
+    @_synchronized
+    def DownloadRoundSummary(self, message):
+        self.validate_header(message)
+
+        return RoundSummary(header=self.create_reply_header(message),
+                            summary=self.round_summary)
 
     @_synchronized
     def RequestJob(self, message):

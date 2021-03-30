@@ -22,6 +22,7 @@ service Aggregator {
     rpc RequestJob(JobRequest) returns (JobReply) {}
     rpc DownloadTensor(TensorDownloadRequest) returns (stream DataStream) {}
     rpc UploadResults(stream DataStream) returns (ResultsAck) {}
+    rpc DownloadRoundSummary(RoundSummaryDownloadRequest) returns (RoundSummary) {}
 }
 
 // handles large size data
@@ -88,7 +89,16 @@ message JobRequest {
     MessageHeader header = 1;
 }
 
+message RoundSummaryDownloadRequest {
+    MessageHeader header = 1;
+}
+
 // AGGREGATOR MESSAGES
+
+message RoundSummary {
+    MessageHeader header = 1;
+    string summary = 2;
+}
 
 message GlobalTensor {
     MessageHeader header = 1;
