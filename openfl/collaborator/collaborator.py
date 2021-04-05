@@ -17,7 +17,7 @@ import numpy as np
 
 from .. import check_type, check_equal, check_not_equal, split_tensor_dict_for_holdouts
 from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ValueDictionary
-from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply
+from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply, RoundSummaryDownloadRequest
 from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
 from ..proto.collaborator_aggregator_interface_pb2 import ModelHeader, TensorProto, TensorDownloadRequest, ResultsUpload
 from ..proto.protoutils import tensor_proto_to_numpy_array, numpy_array_to_tensor_proto
@@ -389,6 +389,12 @@ class Collaborator(object):
         Asks the aggregator for the latest model to download and downloads it.
 
         """
+        # start by getting the summary info from the aggregator for the previous round
+        reply = self.channel.DownloadRoundSummary(RoundSummaryDownloadRequest(header=self.create_message_header()))
+
+        # log the previous round summary
+        self.logger.info("Previous Round Summary:\n{}".format(reply.summary))
+
         # time the download
         download_start = time.time()
 

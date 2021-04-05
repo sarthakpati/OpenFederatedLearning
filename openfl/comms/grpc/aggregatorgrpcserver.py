@@ -90,6 +90,10 @@ class AggregatorGRPCServer(AggregatorServicer):
         # turn data stream into local model update
         return self.aggregator.UploadResults(proto)
 
+    def DownloadRoundSummary(self, request, context):
+        self.validate_collaborator(request, context)
+        return self.aggregator.DownloadRoundSummary(request)
+
     def serve(self,
               agg_port,
               disable_tls=False,
