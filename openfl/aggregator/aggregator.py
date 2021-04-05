@@ -317,24 +317,38 @@ class Aggregator(object):
         if isinstance(model_score, dict):
             model_score = np.average(list(model_score.values()))
 
-        if self.best_model_score is None or self.best_model_score < model_score:
-            self.logger.info("Saved the best model with score {:f}.".format(model_score))
+        new_best_model = False
+        if self.best_model_score is None:
+            new_best_model = True
+        # if dictionary, we simply average their values
+        elif isinstance(model_score, dict):
+            new_best_model = np.average(list(model_score.values())) > np.average(list(self.best_model_score.values()))
+        else:
+            new_best_model = model_score > self.best_model_score
+
+        if new_best_model:
+            self.logger.info("Saved new best model with score {}.".format(model_score))
             self.best_model_score = model_score
             # Save a model proto version to file as current best model.
             self.save_model(os.path.join(self.model_directory, 'best'))
 
+        # FIXME: use pprint?
         # create the collaborator round metrics
-        self.round_summary = {
-            'round': self.round_num,
-            'round_start': self.round_start_time,
-            ''
-        }
+        self.round_summary = 'round: {}\n'.format(self.round_num)
+        self.round_summary += 'round_start: {}\n'.format(self.round_start_time)
+        if isinstance(self.best_model_score, dict):
+            self.round_summary += 'best_model_score:\n'
+            for k, v in self.best_model_score.items():
+                self.round_summary += '\t{}: {}'.format(k, v)
+        else:
+            self.round_summary += 'best_model_score: {}\n'.format(self.best_model_score)
+
         for k in self.metrics_tasks:
-            round_result = self.round_results[k]
-            result_weight = round_result.weight
-            if isinstance(self.value, dict):
-            # FIXME: hack only supports dictionaries one level deep
-            self.round_summary[k] = self.round_results[k]
+            t = self.round_results.task_results[k]
+            self.round_summary += '{}:\n'.format(t.name)
+            self.round_summary += '\tvalue: {}\n'.format(t.value)
+            self.round_summary += '\tweight: {}\n'.format(t.weight)
+            self.round_summary += '\tnum contributors: {}\n'.format(self.round_results.num_collaborators_done(task=k))
 
         # re-initialize our round results
         self.initialize_round_results()
@@ -461,7 +475,7 @@ class Aggregator(object):
         self.validate_header(message)
 
         return RoundSummary(header=self.create_reply_header(message),
-                            summary=self.round_summary)
+                            summary=str(self.round_summary))
 
     @_synchronized
     def RequestJob(self, message):
@@ -580,8 +594,11 @@ class RoundTaskResults(object):
                 return False
         return True
 
-    def num_collaborators_done(self):
-        return sum([self.is_collaborator_done_for_round(c) for c in self.collaborators])
+    def num_collaborators_done(self, task=None):
+        if task is None:
+            return sum([self.is_collaborator_done_for_round(c) for c in self.collaborators])
+        else:
+            return sum([self.has_collaborator_done(c, task) for c in self.collaborators])
 
     def is_task_done_for_round(self, task):
         for collaborator in self.collaborators:
@@ -635,7 +652,15 @@ class StreamingAverage(object):
         if isinstance(values[0], np.ndarray):
             axis = 0
         return np.average(values, weights=weights, axis=axis)
-        
+
+    # unformatted, parseable
+    def __repr__(self):
+        return "{}, weight: {}, value: {}".format(self.name, self.weight, self.value)
+
+    # FIXME: make prettier
+    def __str__(self):
+        return self.__repr__()
+
 
 the_dragon = """
 
