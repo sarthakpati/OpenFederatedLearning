@@ -76,6 +76,7 @@ class Collaborator(object):
                  send_model_deltas = False,
                  single_col_cert_common_name=None,
                  num_retries=5,
+                 brats_stats_upload_filepath=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.channel = channel
@@ -117,6 +118,21 @@ class Collaborator(object):
         # Needs updated when we have proper collab-side state saving.
         self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
 
+        self._upload_brats_stats(brats_stats_upload_filepath)
+
+    # FIXME: generic mechanism for this
+    def _upload_brats_stats(self, path):
+        if path is None or not os.path.exists(path):
+            return
+
+        # on any exception, log and skip uploading
+        try:
+            brats_stats = load_yaml
+            
+        except e:
+            self.logger.info("Brats stats upload from path {} failed with exception:".format(path))
+            self.logger.exception(repr(e))
+ 
     def _remove_and_save_holdout_tensors(self, tensor_dict):
         """Removes tensors from the tensor dictionary
 
