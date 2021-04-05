@@ -409,7 +409,7 @@ class Collaborator(object):
                 new_model_header = global_tensor.header.model_header
             # otherwise, if the tensor versions have changed, we need to exit and request new job
             elif new_model_header.version != global_tensor.header.model_header.version:
-                self.logger("Tensor versions have changed. Canceling Download")
+                self.logger.debug("Tensor versions have changed. Canceling Download")
                 return
 
             # ensure names match
