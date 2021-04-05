@@ -26,3 +26,9 @@ Key points about the network messages/protocol:
   - JOB_UPLOAD_RESULTS: this prompts the _collaborator_ to upload some result. It includes a name from a list of values defined as the layer names of the network, or the metrics "shared model validation", "local model validation", "loss" (training loss). The metrics are each a single floating point value. The model layers are 112 MB of tensors (just as with the download).
   - JOB_SLEEP: this prompts the _collaborator_ to do nothing until its next polling interval (generally sent when the _collaborator_ is done for the round and other _collaborators_ are still training/validating).
   - JOB_QUIT: this prompts the _collaborator_ process to exit because the training of the model is completed.
+* The "job" request is a unary->unary gRPC. Based on the job received, the following gRPCs will be of the following types:
+  - JOB_DOWNLOAD_MODEL: this results in a sequence of unary->datastream requests where the _collaborator_ requests each model tensor in a loop.
+  - JOB_UPLOAD_RESULTS: this results in a sequence of datastream->unary requests where the _collaborator_ uploads each model tensor and the three metrics (2 validation, 1 training loss).
+
+#### Testing a Collaborator
+In order to test a _collaborator_, the _aggregator_ can be set not aggregate updates from specific _collaborators_ so that they can test functionality without impacting the running model training/validation. We hope this enables InfoSec runtime analysis against the live _aggregator_ without the need to access any private data on the _collaborator_ machine running the test. To do this, please coordinate with the FeTS aggregator admins.
