@@ -389,7 +389,13 @@ class Aggregator(object):
         task = message.task
 
         self.logger.debug("Received results for {} from {}".format(message.task, collaborator))
-     
+
+        # if this is for our special print task, simply log each entry in the uploaded dictionary
+        if message.task == "___RESERVED_PRINT_TASK_STRING___":
+            value = dict(message.value_dict.dictionary)
+            self.logger.info("Received brats stats results for {} of {}".format(collaborator, value))
+            return ResultsAck(header=self.create_reply_header(message), discard_round=False)
+
         # if this collaborator is out of date, we need to tell them to discard the remaining updates
         if self.collaborator_out_of_sync(message.header.model_header):
             self.logger.info("{} is out of sync. Replying with discard_round=True".format(collaborator))
