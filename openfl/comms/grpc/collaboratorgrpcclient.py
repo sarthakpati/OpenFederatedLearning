@@ -263,6 +263,15 @@ class CollaboratorGRPCClient:
         return self.stub.RequestJob(message)
 
     @_atomic_connection
+    def DownloadRoundSummary(self, message):
+        """Request Job
+
+        Args:
+            message: Message sent to the collaborator
+        """
+        return self.stub.DownloadRoundSummary(message)
+
+    @_atomic_connection
     def DownloadTensor(self, message):
         """Download Tensor
 
