@@ -71,6 +71,7 @@ class Aggregator(object):
                  runtime_configurable_params=[],
                  collaborator_sleep_time=10,
                  best_model_metric='shared_model_validation',
+                 enrollment_period=np.inf,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
@@ -85,6 +86,8 @@ class Aggregator(object):
         self.round_start_time = None
         self.single_col_cert_common_name = single_col_cert_common_name
         self.collaborator_sleep_time = collaborator_sleep_time
+        self.enrollment_period = enrollment_period
+        self.enrolled = []
 
         self.backup_path = backup_path
         self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
@@ -277,9 +280,15 @@ class Aggregator(object):
         return cutoff
 
     def end_of_round_check(self):
-        end_of_round = self.straggler_cutoff_check() or (self.round_results.num_collaborators_done() == len(self.collaborator_common_names))
+        # at least "minimum_reporting" collaborators must be enrolled
+        if len(self.enrolled) < self.minimum_reporting:
+            return
 
-        if end_of_round:
+        # check if we need to end due to straggler cutoff or because all enrolled collaborators are done
+        straggler_cutoff = self.straggler_cutoff_check()
+        enrolled_collaborators_done = all([self.round_results.is_collaborator_done_for_round(c) for c in self.enrolled])
+
+        if straggler_cutoff or enrolled_collaborators_done:
             self.end_of_round()
 
     def end_of_round(self):
@@ -352,6 +361,9 @@ class Aggregator(object):
 
         # re-initialize our round results
         self.initialize_round_results()
+
+        # set enrolled list to blank
+        self.enrolled = []
 
         # if we have enabled runtime configuration updates, do that now
         if self.runtime_aggregator_config_dir is not None:
@@ -454,9 +466,19 @@ class Aggregator(object):
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
         if self.collaborator_out_of_sync(message.header.model_header):
-            return JobReply(header=self.create_reply_header(message),
-                            job=JOB_DOWNLOAD_MODEL,
-                            extra_model_info=self.extra_model_info)
+            is_enrolled = collaborator in self.enrolled
+            more_than_one_round_out_of_date = self.model_header.version != (message.header.model_header.version + 1)
+            # if the collaborator is enrolled or more than one round out of date, tell them to download
+            if is_enrolled or more_than_one_round_out_of_date:
+                return JobReply(header=self.create_reply_header(message),
+                                job=JOB_DOWNLOAD_MODEL,
+                                extra_model_info=self.extra_model_info)
+            # otherwise, the collaborator could be in a bad loop where they start each round late, 
+            # then miss each enrollment, so they should just sleep for this round
+            else:
+                return JobReply(header=self.create_reply_header(message),
+                                job=JOB_SLEEP,
+                                seconds=self.collaborator_sleep_time)
         
         # the collaborator has the shared model, so now determine what the next upload should be
         next_upload = self.next_collaborator_upload(collaborator)
@@ -496,7 +518,14 @@ class Aggregator(object):
         """
         self.validate_header(message)
         collaborator = message.header.sender
-        
+
+        # start round if it hasn't already
+        if self.round_start_time is None:
+            self.round_start_time = time.time()
+
+        # check enrollment
+        self.check_enrollment(collaborator)
+
         reply = self.determine_next_job(message)
 
         # we log download jobs as info, others as debug
@@ -505,13 +534,9 @@ class Aggregator(object):
         else:
             self.logger.debug("Receive job request from %s and assign with %s" % (collaborator, Job.Name(reply.job)))
 
-        if reply.job is not JOB_SLEEP:
-            # check to see if we need to set our round start time
-            if self.round_start_time is None:
-                self.round_start_time = time.time()
-
-        elif self.straggler_cutoff_time != np.inf:
-            # we have an idle collaborator and a straggler cutoff time, so we should check for early round end
+        if self.straggler_cutoff_time != np.inf and reply.job is JOB_SLEEP:
+            # we have an idle collaborator and a straggler cutoff time, 
+            # so we should check for early round end
             self.end_of_round_check()
         
         return reply
@@ -541,6 +566,23 @@ class Aggregator(object):
                              tensor=tensor_proto)
 
         return reply
+
+    def check_enrollment(self, collaborator):
+        # if already enrolled
+        if collaborator in self.enrolled:
+            return
+
+        # check if enrollment is over
+        # enrollment lasts until we have met the following criteria:
+        # 1. more time has passed than the "enrollment period" value
+        # 2. at least "minimum_reporting" collaborators are enrolled
+        t = time.time() - self.round_start_time
+        if t > self.enrollment_period and len(self.enrolled) >= self.minimum_reporting:
+            return
+
+        # enroll this collaborator
+        self.logger.info("Enrolling collaborator {}".format(collaborator))
+        self.enrolled.append(collaborator)
 
     def collaborators_should_quit(self):
         return self.round_num > self.rounds_to_train
