@@ -38,7 +38,8 @@ def main(plan,
          logging_config_path, 
          logging_default_level, 
          logging_directory, 
-         model_device):
+         model_device,
+         brats_stats_upload_filepath):
     """Runs the collaborator client process from the federation (FL) plan
 
     Args:
@@ -94,7 +95,8 @@ def main(plan,
                                                             metadata_dir,
                                                             single_col_cert_common_name,
                                                             data_dir=data_dir,
-                                                            model_device=model_device)
+                                                            model_device=model_device,
+                                                            brats_stats_upload_filepath=brats_stats_upload_filepath)
 
         collaborator.run()
         sys.exit(0)
@@ -124,5 +126,6 @@ if __name__ == '__main__':
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
     # FIXME: this kind of commandline configuration needs to be done in a consistent way
     parser.add_argument('--model_device', '-md', type=str, default='cpu')
+    parser.add_argument('--brats_stats_upload_filepath', '-bsuf', type=str, default=None)
     args = parser.parse_args()
     main(**vars(args))
