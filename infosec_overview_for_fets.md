@@ -15,7 +15,7 @@ The FeTS software uses a hub-and-spoke topology between _collaborator_ clients t
 * Currently, the _collaborator_ polls the _aggregator_ at a fixed interval. We have had a request to enable client-side configuration of this interval and hope to support that feature soon.
 * Connection timeouts are set to gRPC defaults.
 * If the _aggregator_ is not available, the _collaborator_ will retry connections indefinitely. This is currently useful so that we can take the aggregator down for bugfixes without _collaborator_ processes exiting.
-* Note that there is currently an issue with the library OS the _aggregator_ runs on that can cause TLS decryption failures on the _aggregator_. Currently, the _collaborator_ simply retries the message. We believe that the failure is in the network stack on the _aggregator_ and have alerted the developers of the library OS we use.
+* Note that there is currently an issue with the library OS the _aggregator_ runs on that can cause TLS decryption failures on the _aggregator_ (the integrity check fails). Currently, the _collaborator_ simply retries the message. We believe that the failure is in the network stack on the _aggregator_ and have alerted the developers of the library OS we use.
 
 #### Overview of Contents of Network Messages
 Network messages are well defined protobufs which can be found in https://github.com/IntelLabs/OpenFederatedLearning/blob/fets/openfl/proto/collaborator_aggregator_interface.proto
