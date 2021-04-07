@@ -4,7 +4,7 @@ This document is intended to help InfoSec analysis processes of the collaborator
 In this context, the "FeTS software" refers to the FeTS front-end and the specific configuration of openfl used by the FeTS intiative. Thus we will say that the "FeTS software uses mutually authenticated TLS" because the FeTS initiative uses that configuration of openfl. Openfl supports other configurations, but they are not relevant to this document. Some of the FeTS software comes as submodules from repositories maintained at this time by the University of Pennsylvania (UPenn)
 
 #### Network Connectivity Overview
-The FeTS software uses a hub-and-spoke topology between _collaborator_ clients that generate model parameter updates from their data and the _aggregator_ server that combines their training updates into new models. Openfl provides configuration options, so theseKey details about this functionality are:
+The FeTS software uses a hub-and-spoke topology between _collaborator_ clients that generate model parameter updates from their data and the _aggregator_ server that combines their training updates into new models. Key details about this functionality are:
 * Connections are made using request/response gRPC connections.
 * The _aggregator_ listens for connections on port 50051, so all _collaborators_ must be able to send outgoing traffic on this port.
 * All connections are initiated by the _collaborator_.
