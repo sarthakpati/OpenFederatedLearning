@@ -22,12 +22,12 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: DEBUG
+    level: INFO
     formatter: simple
     stream: ext://sys.stdout
   agg_file_handler:
     class: logging.handlers.RotatingFileHandler
-    level: DEBUG
+    level: INFO
     formatter: simple
     filename: aggregator.log
     maxBytes: 10000000
@@ -35,7 +35,7 @@ handlers:
     encoding: utf8
   col_file_handler:
     class: logging.handlers.RotatingFileHandler
-    level: DEBUG
+    level: INFO
     formatter: simple
     filename: collaborator.log
     maxBytes: 10000000
@@ -43,7 +43,7 @@ handlers:
     encoding: utf8
   inference_file_handler:
     class: logging.handlers.RotatingFileHandler
-    level: DEBUG
+    level: INFO
     formatter: simple
     filename: inference.log
     maxBytes: 10000000
@@ -52,17 +52,17 @@ handlers:
 
 loggers:
   openfl.aggregator:
-    level: DEBUG
+    level: INFO
     handlers: [console, agg_file_handler]
     propagate: yes
   openfl.collaborator:
-    level: DEBUG
+    level: INFO
     handlers: [console, col_file_handler]
     propagate: yes
   inference:
-    level: DEBUG
+    level: INFO
     handlers: [console, inference_file_handler]
     propagate: yes
   root:
-    level: DEBUG
+    level: INFO
     handlers: [console]

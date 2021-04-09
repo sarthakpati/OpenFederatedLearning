@@ -14,14 +14,14 @@
 import time
 import logging
 import numpy as np
+import os
 
-from .. import check_type, check_equal, check_not_equal, split_tensor_dict_for_holdouts
+from .. import check_type, check_equal, check_not_equal, split_tensor_dict_for_holdouts, load_yaml
 from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ValueDictionary
-from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply
+from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply, RoundSummaryDownloadRequest
 from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
 from ..proto.collaborator_aggregator_interface_pb2 import ModelHeader, TensorProto, TensorDownloadRequest, ResultsUpload
 from ..proto.protoutils import tensor_proto_to_numpy_array, numpy_array_to_tensor_proto
-
 
 from enum import Enum
 
@@ -76,6 +76,7 @@ class Collaborator(object):
                  send_model_deltas = False,
                  single_col_cert_common_name=None,
                  num_retries=5,
+                 brats_stats_upload_filepath=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.channel = channel
@@ -117,6 +118,37 @@ class Collaborator(object):
         # Needs updated when we have proper collab-side state saving.
         self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
 
+        self._upload_brats_stats(brats_stats_upload_filepath)
+
+    def _upload_brats_stats(self, path):
+        if path is None or not os.path.exists(path):
+            return
+
+        # on any exception, log and skip uploading
+        try:
+            brats_stats = load_yaml(path)
+            stats = {}
+            # parse the stats into a flat dictionary of string->float pairs
+            for subject, models in brats_stats.items():
+                for model, regions in models.items():
+                    for region, metrics in regions.items():
+                        for metric, value in metrics.items():
+                            key = "{}_{}_{}_{}".format(subject, model, region, metric)
+                            value = float(value)
+                            stats[key] = value
+
+            # we send a results upload with a special task
+            request = ResultsUpload(header=self.create_message_header(),
+                                    weight=0,
+                                    task='___RESERVED_PRINT_TASK_STRING___',
+                                    value_dict=ValueDictionary(dictionary=stats))
+
+            reply = self.channel.UploadResults(request)
+            self.validate_header(reply)
+        except Exception as e:
+            self.logger.info("Brats stats upload from path {} failed with exception:".format(path))
+            self.logger.exception(repr(e))
+ 
     def _remove_and_save_holdout_tensors(self, tensor_dict):
         """Removes tensors from the tensor dictionary
 
@@ -280,7 +312,13 @@ class Collaborator(object):
                                     task=task,
                                     value=result)
 
-        self._request_with_retries(request, upload=True)
+        # we do not crash on exception, but instead abort the job
+        try:
+            reply = self.channel.UploadResults(request)
+            self.validate_header(reply)
+        except Exception as e:
+            self.logger.info("Upload failed with exception:")
+            self.logger.exception(repr(e))
 
     def do_task(self, task):
         # FIXME: this should really not be hard-coded
@@ -362,25 +400,19 @@ class Collaborator(object):
 
         self.round_results[result_name] = (results, data_size)
 
-    def _request_with_retries(self, request, upload=False):
+    def _download_with_retries(self, request):
         # FIXME: this needs to be a more robust response. The aggregator should actually have sent an error code, rather than an unhandled exception
         # an exception can happen in cases where we simply need to retry
+        reply = None
         for i in range(self.num_retries):
             try:
-                if upload:
-                    reply = self.channel.UploadResults(request)
-                else:
-                    reply = self.channel.DownloadTensor(request)
+                reply = self.channel.DownloadTensor(request)
+                self.validate_header(reply)
                 break
             except Exception as e:
                 self.logger.exception(repr(e))
-                # if final retry, raise exception
-                if i + 1 == self.num_retries:
-                    raise e
-                else:
-                    self.logger.warning("Retrying {}. Try {} of {}".format(request.__class__.__name__, i+1, self.num_retries))
+                self.logger.warning("Failed download attempt {} of {}".format(i+1, self.num_retries))
         
-        self.validate_header(reply)
         return reply
 
     def do_download_model_job(self, tensor_names):
@@ -389,6 +421,12 @@ class Collaborator(object):
         Asks the aggregator for the latest model to download and downloads it.
 
         """
+        # start by getting the summary info from the aggregator for the previous round
+        reply = self.channel.DownloadRoundSummary(RoundSummaryDownloadRequest(header=self.create_message_header()))
+
+        # log the previous round summary
+        self.logger.info("Previous Round Summary:\n{}".format(reply.summary))
+
         # time the download
         download_start = time.time()
 
@@ -399,14 +437,17 @@ class Collaborator(object):
         downloaded_tensors = {}
         for tensor_name in tensor_names:
             request = TensorDownloadRequest(header=self.create_message_header(), tensor_name=tensor_name)
-            global_tensor = self._request_with_retries(request, upload=False)
+            global_tensor = self._download_with_retries(request)
+            # if none, we have failed 5 consecutive attempts and should abort the job
+            if global_tensor is None:
+                return
 
             # if this is our first tensor downloaded, we set first version
             if new_model_header is None:
                 new_model_header = global_tensor.header.model_header
             # otherwise, if the tensor versions have changed, we need to exit and request new job
             elif new_model_header.version != global_tensor.header.model_header.version:
-                self.logger("Tensor versions have changed. Canceling Download")
+                self.logger.debug("Tensor versions have changed. Canceling Download")
                 return
 
             # ensure names match

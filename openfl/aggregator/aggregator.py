@@ -23,7 +23,7 @@ from threading import Lock
 
 from .. import check_equal, check_not_equal, check_is_in, check_not_in, load_yaml, hash_string
 from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ModelHeader, TensorProto
-from ..proto.collaborator_aggregator_interface_pb2 import GlobalTensor, JobReply, ResultsAck, ExtraModelInfo
+from ..proto.collaborator_aggregator_interface_pb2 import GlobalTensor, JobReply, ResultsAck, ExtraModelInfo, RoundSummary
 from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest
 from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
 from openfl.proto.protoutils import dump_proto, load_proto, tensor_proto_to_numpy_array, numpy_array_to_tensor_proto
@@ -68,9 +68,10 @@ class Aggregator(object):
                  send_metadata_to_clients=False,
                  backup_path=None,
                  runtime_aggregator_config_dir=None,
-                 runtime_configurable_params=None,
+                 runtime_configurable_params=[],
                  collaborator_sleep_time=10,
                  best_model_metric='shared_model_validation',
+                 enrollment_period=np.inf,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
@@ -85,10 +86,16 @@ class Aggregator(object):
         self.round_start_time = None
         self.single_col_cert_common_name = single_col_cert_common_name
         self.collaborator_sleep_time = collaborator_sleep_time
+        self.enrollment_period = enrollment_period
+        self.enrolled = []
 
         self.backup_path = backup_path
         self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
         self.runtime_configurable_params = runtime_configurable_params
+
+        self._GRACEFULLY_QUIT = False
+        self.best_model_metric = best_model_metric
+        self.ignore_list = []
 
         if self.runtime_aggregator_config_dir is not None:
             self.update_config_from_filesystem()
@@ -103,12 +110,12 @@ class Aggregator(object):
 
         self.round_num = self.model_header.version + 1
 
-        self._GRACEFULLY_QUIT = False
+        self.round_summary = 'start of federation'
+
         self._do_quit = False
 
         self.initialize_round_results()
         self.best_model_score = None
-        self.best_model_metric = best_model_metric
         self.mutex = Lock()
 
     def create_task_list(self):
@@ -151,13 +158,10 @@ class Aggregator(object):
         dump_proto(proto, os.path.join(directory, '{}.pbuf'.format(t_hash)))
 
     def initialize_round_results(self):
-        self.round_results = RoundTaskResults(self.collaborator_common_names, self.tasks, self.logger)
+        self.round_results = RoundTaskResults(self.collaborator_common_names, self.tasks, self.logger, self.metrics_tasks)
 
     def update_config_from_filesystem(self):
         if self.runtime_aggregator_config_dir is None:
-            return
-
-        if self.runtime_configurable_params is None:
             return
 
         # make the directory for convenience
@@ -173,8 +177,15 @@ class Aggregator(object):
             self.logger.info("Aggregator did not find config file: {}".format(config_file))
             return
 
+        # if "ignore_list" is not present, reset it to empty
+        if 'ignore_list' not in config:
+            self.ignore_list = []
+
         for k, v in config.items():
             if k == '_GRACEFULLY_QUIT':
+                setattr(self, k, v)
+                self.logger.info("Aggregator config {} updated to {}".format(k, v))
+            elif k == 'ignore_list':
                 setattr(self, k, v)
                 self.logger.info("Aggregator config {} updated to {}".format(k, v))
             elif k not in self.runtime_configurable_params:
@@ -269,9 +280,15 @@ class Aggregator(object):
         return cutoff
 
     def end_of_round_check(self):
-        end_of_round = self.straggler_cutoff_check() or (self.round_results.num_collaborators_done() == len(self.collaborator_common_names))
+        # at least "minimum_reporting" collaborators must be enrolled
+        if len(self.enrolled) < self.minimum_reporting:
+            return
 
-        if end_of_round:
+        # check if we need to end due to straggler cutoff or because all enrolled collaborators are done
+        straggler_cutoff = self.straggler_cutoff_check()
+        enrolled_collaborators_done = all([self.round_results.is_collaborator_done_for_round(c) for c in self.enrolled])
+
+        if straggler_cutoff or enrolled_collaborators_done:
             self.end_of_round()
 
     def end_of_round(self):
@@ -309,14 +326,44 @@ class Aggregator(object):
         if isinstance(model_score, dict):
             model_score = np.average(list(model_score.values()))
 
-        if self.best_model_score is None or self.best_model_score < model_score:
-            self.logger.info("Saved the best model with score {:f}.".format(model_score))
+        new_best_model = False
+        if self.best_model_score is None:
+            new_best_model = True
+        # if dictionary, we simply average their values
+        elif isinstance(model_score, dict):
+            new_best_model = np.average(list(model_score.values())) > np.average(list(self.best_model_score.values()))
+        else:
+            new_best_model = model_score > self.best_model_score
+
+        if new_best_model:
+            self.logger.info("Saved new best model with score {}.".format(model_score))
             self.best_model_score = model_score
             # Save a model proto version to file as current best model.
             self.save_model(os.path.join(self.model_directory, 'best'))
 
+        # FIXME: use pprint?
+        # create the collaborator round metrics
+        self.round_summary = 'round: {}\n'.format(self.round_num)
+        self.round_summary += 'round_start: {}\n'.format(self.round_start_time)
+        if isinstance(self.best_model_score, dict):
+            self.round_summary += 'best_model_score:\n'
+            for k, v in self.best_model_score.items():
+                self.round_summary += '\t{}: {}'.format(k, v)
+        else:
+            self.round_summary += 'best_model_score: {}\n'.format(self.best_model_score)
+
+        for k in self.metrics_tasks:
+            t = self.round_results.task_results[k]
+            self.round_summary += '{}:\n'.format(t.name)
+            self.round_summary += '\tvalue: {}\n'.format(t.value)
+            self.round_summary += '\tweight: {}\n'.format(t.weight)
+            self.round_summary += '\tnum contributors: {}\n'.format(self.round_results.num_collaborators_done(task=k))
+
         # re-initialize our round results
         self.initialize_round_results()
+
+        # set enrolled list to blank
+        self.enrolled = []
 
         # if we have enabled runtime configuration updates, do that now
         if self.runtime_aggregator_config_dir is not None:
@@ -354,7 +401,13 @@ class Aggregator(object):
         task = message.task
 
         self.logger.debug("Received results for {} from {}".format(message.task, collaborator))
-     
+
+        # if this is for our special print task, simply log each entry in the uploaded dictionary
+        if message.task == "___RESERVED_PRINT_TASK_STRING___":
+            value = dict(message.value_dict.dictionary)
+            self.logger.info("Received brats stats results for {} of {}".format(collaborator, value))
+            return ResultsAck(header=self.create_reply_header(message), discard_round=False)
+
         # if this collaborator is out of date, we need to tell them to discard the remaining updates
         if self.collaborator_out_of_sync(message.header.model_header):
             self.logger.info("{} is out of sync. Replying with discard_round=True".format(collaborator))
@@ -395,14 +448,37 @@ class Aggregator(object):
                 self.quit_job_sent_to.append(collaborator)        
             return JobReply(header=self.create_reply_header(message),
                             job=JOB_QUIT)
-            
+
+        # if _do_quit is set, we should tell them to sleep
+        # this occurs because the server has not yet actually quit
+        if self._do_quit:
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_SLEEP,
+                            seconds=self.collaborator_sleep_time)
+
+        # if this collaborator is in the ignore list, tell them to sleep
+        if collaborator in self.ignore_list:
+            return JobReply(header=self.create_reply_header(message),
+                            job=JOB_SLEEP,
+                            seconds=self.collaborator_sleep_time)
+
         # FIXME: this flow needs to depend on a job selection output for the round
         # for now, all jobs require an in-sync model, so it is the first check
         # check if the sender model is out of date
         if self.collaborator_out_of_sync(message.header.model_header):
-            return JobReply(header=self.create_reply_header(message),
-                            job=JOB_DOWNLOAD_MODEL,
-                            extra_model_info=self.extra_model_info)
+            is_enrolled = collaborator in self.enrolled
+            more_than_one_round_out_of_date = self.model_header.version != (message.header.model_header.version + 1)
+            # if the collaborator is enrolled or more than one round out of date, tell them to download
+            if is_enrolled or more_than_one_round_out_of_date:
+                return JobReply(header=self.create_reply_header(message),
+                                job=JOB_DOWNLOAD_MODEL,
+                                extra_model_info=self.extra_model_info)
+            # otherwise, the collaborator could be in a bad loop where they start each round late, 
+            # then miss each enrollment, so they should just sleep for this round
+            else:
+                return JobReply(header=self.create_reply_header(message),
+                                job=JOB_SLEEP,
+                                seconds=self.collaborator_sleep_time)
         
         # the collaborator has the shared model, so now determine what the next upload should be
         next_upload = self.next_collaborator_upload(collaborator)
@@ -423,6 +499,13 @@ class Aggregator(object):
         return None
 
     @_synchronized
+    def DownloadRoundSummary(self, message):
+        self.validate_header(message)
+
+        return RoundSummary(header=self.create_reply_header(message),
+                            summary=str(self.round_summary))
+
+    @_synchronized
     def RequestJob(self, message):
         """Parse message for job request and act accordingly.
 
@@ -435,7 +518,14 @@ class Aggregator(object):
         """
         self.validate_header(message)
         collaborator = message.header.sender
-        
+
+        # start round if it hasn't already
+        if self.round_start_time is None:
+            self.round_start_time = time.time()
+
+        # check enrollment
+        self.check_enrollment(collaborator)
+
         reply = self.determine_next_job(message)
 
         # we log download jobs as info, others as debug
@@ -444,13 +534,9 @@ class Aggregator(object):
         else:
             self.logger.debug("Receive job request from %s and assign with %s" % (collaborator, Job.Name(reply.job)))
 
-        if reply.job is not JOB_SLEEP:
-            # check to see if we need to set our round start time
-            if self.round_start_time is None:
-                self.round_start_time = time.time()
-
-        elif self.straggler_cutoff_time != np.inf:
-            # we have an idle collaborator and a straggler cutoff time, so we should check for early round end
+        if self.straggler_cutoff_time != np.inf and reply.job is JOB_SLEEP:
+            # we have an idle collaborator and a straggler cutoff time, 
+            # so we should check for early round end
             self.end_of_round_check()
         
         return reply
@@ -480,6 +566,23 @@ class Aggregator(object):
                              tensor=tensor_proto)
 
         return reply
+
+    def check_enrollment(self, collaborator):
+        # if already enrolled
+        if collaborator in self.enrolled:
+            return
+
+        # check if enrollment is over
+        # enrollment lasts until we have met the following criteria:
+        # 1. more time has passed than the "enrollment period" value
+        # 2. at least "minimum_reporting" collaborators are enrolled
+        t = time.time() - self.round_start_time
+        if t > self.enrollment_period and len(self.enrolled) >= self.minimum_reporting:
+            return
+
+        # enroll this collaborator
+        self.logger.info("Enrolling collaborator {}".format(collaborator))
+        self.enrolled.append(collaborator)
 
     def collaborators_should_quit(self):
         return self.round_num > self.rounds_to_train
@@ -522,10 +625,11 @@ class Aggregator(object):
 
 # this holds the streaming average results for the tasks, including both metrics and scalars
 class RoundTaskResults(object):
-    def __init__(self, collaborators, tasks, logger):
+    def __init__(self, collaborators, tasks, logger, log_these=None):
         self.collaborators = collaborators
         self.tasks = tasks
         self.logger = logger
+        self.log_these = log_these
         # FIXME: This has all collaborators do all tasks for a round
         self.task_results = {t: StreamingAverage(t, logger) for t in tasks}
 
@@ -538,8 +642,11 @@ class RoundTaskResults(object):
                 return False
         return True
 
-    def num_collaborators_done(self):
-        return sum([self.is_collaborator_done_for_round(c) for c in self.collaborators])
+    def num_collaborators_done(self, task=None):
+        if task is None:
+            return sum([self.is_collaborator_done_for_round(c) for c in self.collaborators])
+        else:
+            return sum([self.has_collaborator_done(c, task) for c in self.collaborators])
 
     def is_task_done_for_round(self, task):
         for collaborator in self.collaborators:
@@ -548,6 +655,8 @@ class RoundTaskResults(object):
         return True
 
     def update_from_collaborator(self, collaborator, task, value, weight):
+        if self.log_these is not None and self.logger is not None and task in self.log_these:
+            self.logger.info("Received update from {} for {} with value {} and weight {}".format(collaborator, task, value, weight))
         self.task_results[task].update_from_collaborator(collaborator, value, weight)
     
     def get_tensor(self, tensor_name):
@@ -591,7 +700,15 @@ class StreamingAverage(object):
         if isinstance(values[0], np.ndarray):
             axis = 0
         return np.average(values, weights=weights, axis=axis)
-        
+
+    # unformatted, parseable
+    def __repr__(self):
+        return "{}, weight: {}, value: {}".format(self.name, self.weight, self.value)
+
+    # FIXME: make prettier
+    def __str__(self):
+        return self.__repr__()
+
 
 the_dragon = """
 

@@ -23,7 +23,7 @@ class DummyModel(FLModel):
     """Generic (dummy) model
     """
 
-    def __init__(self, data, layer_shapes, train_time_mean, train_time_std, val_time_mean, val_time_std, **kwargs):
+    def __init__(self, data, layer_shapes, train_time_mean, train_time_std, val_time_mean, val_time_std, val_keys=None, **kwargs):
         """Initializer
 
         Args:
@@ -44,6 +44,7 @@ class DummyModel(FLModel):
         self.train_time_std = train_time_std
         self.val_time_mean = val_time_mean
         self.val_time_std = val_time_std
+        self.val_keys = val_keys
 
     def train_batches(self, **kwargs):
         """For this dummy model just randomly sleep for a few seconds
@@ -55,7 +56,10 @@ class DummyModel(FLModel):
         """For this dummy model just randomly sleep for a few seconds
         """
         self.random_sleep(self.val_time_mean, self.val_time_std)
-        return np.random.random()
+        if self.val_keys is None:
+            return np.random.random()
+        else:
+            return {k: np.random.random() for k in self.val_keys}
 
     def get_tensor_dict(self, with_opt_vars):
         """Get the tensor dictionary
