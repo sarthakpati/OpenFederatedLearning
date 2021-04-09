@@ -57,8 +57,7 @@ gandlf_whl				= submodules/fets_ai/Algorithms/GANDLF/dist/GANDLF-0.0.7.dev0-py3-
 # the python virtual env recipe
 $(venv):
 	$(python_version) -m venv venv
-	# specifying pip version to avoid issue with later intel-tensorflow install
-	venv/bin/pip3 install --force-reinstall pip==19.0
+	venv/bin/pip3 install --upgrade pip
 	venv/bin/pip3 install --upgrade setuptools
 	venv/bin/pip3 install --upgrade wheel
 	venv/bin/pip3 install --upgrade pyyaml

@@ -4,7 +4,7 @@ This document is intended to help InfoSec analysis processes of the collaborator
 In this context, the "FeTS software" refers to the FeTS front-end and the specific configuration of openfl used by the FeTS intiative. Thus we will say that the "FeTS software uses mutually authenticated TLS" because the FeTS initiative uses that configuration of openfl. Openfl supports other configurations, but they are not relevant to this document. Some of the FeTS software comes as submodules from repositories maintained at this time by the University of Pennsylvania (UPenn)
 
 #### Network Connectivity Overview
-The FeTS software uses a hub-and-spoke topology between _collaborator_ clients that generate model parameter updates from their data and the _aggregator_ server that combines their training updates into new models. Openfl provides configuration options, so theseKey details about this functionality are:
+The FeTS software uses a hub-and-spoke topology between _collaborator_ clients that generate model parameter updates from their data and the _aggregator_ server that combines their training updates into new models. Key details about this functionality are:
 * Connections are made using request/response gRPC connections.
 * The _aggregator_ listens for connections on port 50051, so all _collaborators_ must be able to send outgoing traffic on this port.
 * All connections are initiated by the _collaborator_.
@@ -14,8 +14,8 @@ The FeTS software uses a hub-and-spoke topology between _collaborator_ clients t
 * The PKI for FeTS is currently created specifically for FeTS using openssl tools. The team at UPenn acts as the certificate authority to verify each identity before signing.
 * Currently, the _collaborator_ polls the _aggregator_ at a fixed interval. We have had a request to enable client-side configuration of this interval and hope to support that feature soon.
 * Connection timeouts are set to gRPC defaults.
-* If the _aggregator_ is not available, the _collaborator_ will retry connections indefinitely. This is currently useful so that we can take the aggregator down for bugfixes without _collaborator_ processes crashing.
-* Note that there is currently an issue with the library OS the _aggregator_ runs on that can cause TLS decryption failures on the _aggregator_. Currently, the _collaborator_ simply retries the message. We believe that the failure is in the network stack on the _aggregator_ and have alerted the developers of the library OS we use.
+* If the _aggregator_ is not available, the _collaborator_ will retry connections indefinitely. This is currently useful so that we can take the aggregator down for bugfixes without _collaborator_ processes exiting.
+* Note that there is currently an issue with the library OS the _aggregator_ runs on that can cause TLS decryption failures on the _aggregator_ (the integrity check fails). Currently, the _collaborator_ simply retries the message. We believe that the failure is in the network stack on the _aggregator_ and have alerted the developers of the library OS we use.
 
 #### Overview of Contents of Network Messages
 Network messages are well defined protobufs which can be found in https://github.com/IntelLabs/OpenFederatedLearning/blob/fets/openfl/proto/collaborator_aggregator_interface.proto
