@@ -384,8 +384,8 @@ class Aggregator(object):
         self.round_start_time = None
 
         self._do_quit = self._GRACEFULLY_QUIT
-
-    def _synchronized(self, func):
+    
+    def _synchronized(func):
         def wrapper(self, *args, **kwargs):
             self.mutex.acquire(blocking=True)
             try:
