@@ -68,6 +68,14 @@ message ValueDictionary {
     map<string, float> dictionary = 1;
 }
 
+message FloatList {
+        repeated float float_list = 1;
+        }
+
+message ListValueDictionary {
+    map<string, FloatList> list_dictionary = 1;
+    }
+
 // COLLABORATOR MESSAGES
 message TensorDownloadRequest {
     MessageHeader header = 1;
@@ -82,6 +90,7 @@ message ResultsUpload {
         TensorProto tensor = 4;
         float value = 5;
         ValueDictionary value_dict = 6;
+        ListValueDictionary list_value_dict = 7;
     }
 }
 

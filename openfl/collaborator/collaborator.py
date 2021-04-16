@@ -17,7 +17,7 @@ import numpy as np
 import os
 
 from .. import check_type, check_equal, check_not_equal, split_tensor_dict_for_holdouts, load_yaml
-from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ValueDictionary
+from ..proto.collaborator_aggregator_interface_pb2 import MessageHeader, ValueDictionary, ListValueDictionary, FloatList 
 from ..proto.collaborator_aggregator_interface_pb2 import Job, JobRequest, JobReply, RoundSummaryDownloadRequest
 from ..proto.collaborator_aggregator_interface_pb2 import JOB_DOWNLOAD_MODEL, JOB_UPLOAD_RESULTS, JOB_SLEEP, JOB_QUIT
 from ..proto.collaborator_aggregator_interface_pb2 import ModelHeader, TensorProto, TensorDownloadRequest, ResultsUpload
@@ -134,14 +134,14 @@ class Collaborator(object):
                     for region, metrics in regions.items():
                         for metric, value in metrics.items():
                             key = "{}_{}_{}_{}".format(subject, model, region, metric)
-                            value = float(value)
+                            value = FloatList(float_list=[float(entry) for entry in value])
                             stats[key] = value
 
             # we send a results upload with a special task
             request = ResultsUpload(header=self.create_message_header(),
                                     weight=0,
                                     task='___RESERVED_PRINT_TASK_STRING___',
-                                    value_dict=ValueDictionary(dictionary=stats))
+                                    value_dict=ListValueDictionary(list_dictionary=stats))
 
             reply = self.channel.UploadResults(request)
             self.validate_header(reply)
@@ -302,11 +302,18 @@ class Collaborator(object):
                                     task=task,
                                     tensor=numpy_array_to_tensor_proto(result, task))
         elif isinstance(result, dict):
-            request = ResultsUpload(header=self.create_message_header(),
-                                    weight=weight,
-                                    task=task,
-                                    value_dict=ValueDictionary(dictionary=result))
-        else:
+            if isinstance(results[list(results.keys())[0]], list):
+                dict_of_protos = {key FloatList(float_list=results[key]) for key in results}
+                request = ResultsUpload(header=self.create_message_header(),
+                                        weight=weight,
+                                        task=task,
+                                        value_dict=ListValueDictionary(list_dictionary=dict_of_protos))
+            elif isinstance(results[list(results.keys())[0]], float):
+                request = ResultsUpload(header=self.create_message_header(),
+                                        weight=weight,
+                                        task=task,
+                                        value_dict=ValueDictionary(dictionary=result))
+            else:
             request = ResultsUpload(header=self.create_message_header(),
                                     weight=weight,
                                     task=task,

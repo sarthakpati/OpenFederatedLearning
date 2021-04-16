@@ -37,21 +37,22 @@ class Aggregator(object):
     """An Aggregator is the central node in federated learning.
 
     Args:
-        aggregator_uuid (string)                : UUID of this object.
-        federation_uuid (string)                : Federation UUID.
-        collaborator_common_names (list of str) : The list of approved collaborator IDs. These IDs should match the common_names in the collaborator certificates, unless "single_col_cert_common_name" is specified.
-        init_model_fpath (string)               : The filepath of the initial weights file.
-        latest_model_fpath (string)             : The filepath to store the latest aggregated weights
-        best_model_fpath (string)               : The filepath to store the weight of the best model.
-        rounds_to_train (int)                   : Number of rounds to train (default: 256)
-        minimum_reporting (int)                 : Aggregator will not end a round early until this number of clients has reported in. (default: -1)
-        straggler_cutoff_time (scalar)          : Aggregator will not end a round early until this number of seconds has passed. (default: np.inf)
-        single_col_cert_common_name (string)    : (default: None)
-        compression_pipeline                    : (default: None)
-        init_metadata_fname (string)            : (default: None)
-        latest_metadata_fname (string)          : (default: None)
-        send_metadata_to_clients (bool)         : (default: False)
-        kwargs                                  : Currently unused
+        aggregator_uuid (string)                    : UUID of this object.
+        federation_uuid (string)                    : Federation UUID.
+        collaborator_common_names (list of str)     : The list of approved collaborator IDs. These IDs should match the common_names in the collaborator certificates, unless "single_col_cert_common_name" is specified.
+        init_model_fpath (string)                   : The filepath of the initial weights file.
+        latest_model_fpath (string)                 : The filepath to store the latest aggregated weights
+        best_model_fpath (string)                   : The filepath to store the weight of the best model.
+        rounds_to_train (int)                       : Number of rounds to train (default: 256)
+        minimum_reporting (int)                     : Aggregator will not end a round early until this number of clients has reported in. (default: -1)
+        straggler_cutoff_time (scalar)              : Aggregator will not end a round early until this number of seconds has passed. (default: np.inf)
+        single_col_cert_common_name (string)        : (default: None)
+        compression_pipeline                        : (default: None)
+        init_metadata_fname (string)                : (default: None)
+        latest_metadata_fname (string)              : (default: None)
+        send_metadata_to_clients (bool)             : (default: False)
+        model_selection_val_keys (list of string)   : (default: None)
+        kwargs                                      : Currently unused
     """
     # FIXME: no selector logic is in place
     def __init__(self,
@@ -72,6 +73,7 @@ class Aggregator(object):
                  collaborator_sleep_time=10,
                  best_model_metric='shared_model_validation',
                  enrollment_period=np.inf,
+                 model_selection_val_keys=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
@@ -88,6 +90,8 @@ class Aggregator(object):
         self.collaborator_sleep_time = collaborator_sleep_time
         self.enrollment_period = enrollment_period
         self.enrolled = []
+
+        self.model_selection_val_keys = model_selection_val_keys
 
         self.backup_path = backup_path
         self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
@@ -329,9 +333,15 @@ class Aggregator(object):
         new_best_model = False
         if self.best_model_score is None:
             new_best_model = True
-        # if dictionary, we simply average their values
+        # if dictionary, we simply average their values (considering selection keys if appropriate)
         elif isinstance(model_score, dict):
-            new_best_model = np.average(list(model_score.values())) > np.average(list(self.best_model_score.values()))
+            if self.model_selection_val_keys is not None:
+                these_model_subscores = [val for key, val in model_score.items() if key in self.model_selection_val_keys]
+                best_model_subscores = [val for key, val in best_model_score.items() if key in self.model_selection_val_keys]
+            else:
+                these_model_subscores = list(model_scores.values())
+                best_model_subscores = list(best_model_scores.values())
+            new_best_model = np.average(these_model_subscores) > np.average(best_model_subscores)
         else:
             new_best_model = model_score > self.best_model_score
 
