@@ -302,13 +302,13 @@ class Collaborator(object):
                                     task=task,
                                     tensor=numpy_array_to_tensor_proto(result, task))
         elif isinstance(result, dict):
-            if isinstance(results[list(results.keys())[0]], list):
-                dict_of_protos = {key: FloatList(float_list=results[key]) for key in results}
+            if isinstance(result[list(result.keys())[0]], list):
+                dict_of_protos = {key: FloatList(float_list=result[key]) for key in result}
                 request = ResultsUpload(header=self.create_message_header(),
                                         weight=weight,
                                         task=task,
                                         value_dict=ListValueDictionary(list_dictionary=dict_of_protos))
-            elif isinstance(results[list(results.keys())[0]], float):
+            elif isinstance(result[list(result.keys())[0]], float):
                 request = ResultsUpload(header=self.create_message_header(),
                                         weight=weight,
                                         task=task,
