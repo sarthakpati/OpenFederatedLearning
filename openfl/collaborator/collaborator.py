@@ -303,7 +303,7 @@ class Collaborator(object):
                                     tensor=numpy_array_to_tensor_proto(result, task))
         elif isinstance(result, dict):
             if isinstance(result[list(result.keys())[0]], list):
-                dict_of_protos = {key: FloatList(float_list=result[key]) for key in result}
+                dict_of_protos = {key: FloatList(value=result[key]) for key in result}
                 request = ResultsUpload(header=self.create_message_header(),
                                         weight=weight,
                                         task=task,
