@@ -307,12 +307,12 @@ class Collaborator(object):
                 request = ResultsUpload(header=self.create_message_header(),
                                         weight=weight,
                                         task=task,
-                                        value_dict=ListValueDictionary(list_dictionary=dict_of_protos))
+                                        list_value_dict=ListValueDictionary(list_dictionary=dict_of_protos))
             elif isinstance(result[list(result.keys())[0]], float):
                 request = ResultsUpload(header=self.create_message_header(),
                                         weight=weight,
                                         task=task,
-                                        list_value_dict=ValueDictionary(dictionary=result))
+                                        value_dict=ValueDictionary(dictionary=result))
         else:
             request = ResultsUpload(header=self.create_message_header(),
                                     weight=weight,
