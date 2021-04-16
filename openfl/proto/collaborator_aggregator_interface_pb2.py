@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='openfl_proto',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\'collaborator_aggregator_interface.proto\x12\x0copenfl_proto\"+\n\nDataStream\x12\x0c\n\x04size\x18\x01 \x01(\r\x12\x0f\n\x07npbytes\x18\x02 \x01(\x0c\">\n\x0bTensorProto\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x12\n\ndata_bytes\x18\x02 \x01(\x0c\x12\r\n\x05shape\x18\x03 \x03(\x05\"*\n\x0bModelHeader\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x05\"\xb0\x01\n\rMessageHeader\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x11\n\trecipient\x18\x02 \x01(\t\x12\x15\n\rfederation_id\x18\x03 \x01(\t\x12/\n\x0cmodel_header\x18\x04 \x01(\x0b\x32\x19.openfl_proto.ModelHeader\x12\x0f\n\x07\x63ounter\x18\x05 \x01(\x05\x12#\n\x1bsingle_col_cert_common_name\x18\x06 \x01(\t\"&\n\x0e\x45xtraModelInfo\x12\x14\n\x0ctensor_names\x18\x01 \x03(\t\"\x87\x01\n\x0fValueDictionary\x12\x41\n\ndictionary\x18\x01 \x03(\x0b\x32-.openfl_proto.ValueDictionary.DictionaryEntry\x1a\x31\n\x0f\x44ictionaryEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01\"\x1f\n\tFloatList\x12\x12\n\nfloat_list\x18\x01 \x03(\x02\"\xb5\x01\n\x13ListValueDictionary\x12N\n\x0flist_dictionary\x18\x01 \x03(\x0b\x32\x35.openfl_proto.ListValueDictionary.ListDictionaryEntry\x1aN\n\x13ListDictionaryEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12&\n\x05value\x18\x02 \x01(\x0b\x32\x17.openfl_proto.FloatList:\x02\x38\x01\"Y\n\x15TensorDownloadRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x13\n\x0btensor_name\x18\x02 \x01(\t\"\x94\x02\n\rResultsUpload\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x0e\n\x06weight\x18\x02 \x01(\x05\x12\x0c\n\x04task\x18\x03 \x01(\t\x12+\n\x06tensor\x18\x04 \x01(\x0b\x32\x19.openfl_proto.TensorProtoH\x00\x12\x0f\n\x05value\x18\x05 \x01(\x02H\x00\x12\x33\n\nvalue_dict\x18\x06 \x01(\x0b\x32\x1d.openfl_proto.ValueDictionaryH\x00\x12<\n\x0flist_value_dict\x18\x07 \x01(\x0b\x32!.openfl_proto.ListValueDictionaryH\x00\x42\x07\n\x05\x65xtra\"9\n\nJobRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\"J\n\x1bRoundSummaryDownloadRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\"L\n\x0cRoundSummary\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x0f\n\x07summary\x18\x02 \x01(\t\"f\n\x0cGlobalTensor\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12)\n\x06tensor\x18\x02 \x01(\x0b\x32\x19.openfl_proto.TensorProto\"\xbd\x01\n\x08JobReply\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x1e\n\x03job\x18\x02 \x01(\x0e\x32\x11.openfl_proto.Job\x12\x38\n\x10\x65xtra_model_info\x18\x03 \x01(\x0b\x32\x1c.openfl_proto.ExtraModelInfoH\x00\x12\x0e\n\x04name\x18\x04 \x01(\tH\x00\x12\x11\n\x07seconds\x18\x05 \x01(\x05H\x00\x42\x07\n\x05\x65xtra\"P\n\nResultsAck\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x15\n\rdiscard_round\x18\x02 \x01(\x08\"v\n\x11LegacyTensorProto\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x12\n\ndata_bytes\x18\x03 \x01(\x0c\x12?\n\x14transformer_metadata\x18\x04 \x03(\x0b\x32!.openfl_proto.LegacyMetadataProto\"^\n\x11LegacyModelHeader\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08is_delta\x18\x02 \x01(\x08\x12\x1a\n\x12\x64\x65lta_from_version\x18\x03 \x01(\x05\x12\x0f\n\x07version\x18\x04 \x01(\x05\"u\n\x10LegacyModelProto\x12/\n\x06header\x18\x01 \x01(\x0b\x32\x1f.openfl_proto.LegacyModelHeader\x12\x30\n\x07tensors\x18\x02 \x03(\x0b\x32\x1f.openfl_proto.LegacyTensorProto\"\xb6\x01\n\x13LegacyMetadataProto\x12G\n\x0cint_to_float\x18\x01 \x03(\x0b\x32\x31.openfl_proto.LegacyMetadataProto.IntToFloatEntry\x12\x10\n\x08int_list\x18\x02 \x03(\x05\x12\x11\n\tbool_list\x18\x03 \x03(\x08\x1a\x31\n\x0fIntToFloatEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01*R\n\x03Job\x12\x16\n\x12JOB_DOWNLOAD_MODEL\x10\x00\x12\x16\n\x12JOB_UPLOAD_RESULTS\x10\x01\x12\r\n\tJOB_SLEEP\x10\x02\x12\x0c\n\x08JOB_QUIT\x10\x03\x32\xcd\x02\n\nAggregator\x12@\n\nRequestJob\x12\x18.openfl_proto.JobRequest\x1a\x16.openfl_proto.JobReply\"\x00\x12S\n\x0e\x44ownloadTensor\x12#.openfl_proto.TensorDownloadRequest\x1a\x18.openfl_proto.DataStream\"\x00\x30\x01\x12G\n\rUploadResults\x12\x18.openfl_proto.DataStream\x1a\x18.openfl_proto.ResultsAck\"\x00(\x01\x12_\n\x14\x44ownloadRoundSummary\x12).openfl_proto.RoundSummaryDownloadRequest\x1a\x1a.openfl_proto.RoundSummary\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\'collaborator_aggregator_interface.proto\x12\x0copenfl_proto\"+\n\nDataStream\x12\x0c\n\x04size\x18\x01 \x01(\r\x12\x0f\n\x07npbytes\x18\x02 \x01(\x0c\">\n\x0bTensorProto\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x12\n\ndata_bytes\x18\x02 \x01(\x0c\x12\r\n\x05shape\x18\x03 \x03(\x05\"*\n\x0bModelHeader\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x05\"\xb0\x01\n\rMessageHeader\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x11\n\trecipient\x18\x02 \x01(\t\x12\x15\n\rfederation_id\x18\x03 \x01(\t\x12/\n\x0cmodel_header\x18\x04 \x01(\x0b\x32\x19.openfl_proto.ModelHeader\x12\x0f\n\x07\x63ounter\x18\x05 \x01(\x05\x12#\n\x1bsingle_col_cert_common_name\x18\x06 \x01(\t\"&\n\x0e\x45xtraModelInfo\x12\x14\n\x0ctensor_names\x18\x01 \x03(\t\"\x87\x01\n\x0fValueDictionary\x12\x41\n\ndictionary\x18\x01 \x03(\x0b\x32-.openfl_proto.ValueDictionary.DictionaryEntry\x1a\x31\n\x0f\x44ictionaryEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01\"\x1a\n\tFloatList\x12\r\n\x05value\x18\x01 \x03(\x02\"\xb5\x01\n\x13ListValueDictionary\x12N\n\x0flist_dictionary\x18\x01 \x03(\x0b\x32\x35.openfl_proto.ListValueDictionary.ListDictionaryEntry\x1aN\n\x13ListDictionaryEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12&\n\x05value\x18\x02 \x01(\x0b\x32\x17.openfl_proto.FloatList:\x02\x38\x01\"Y\n\x15TensorDownloadRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x13\n\x0btensor_name\x18\x02 \x01(\t\"\x94\x02\n\rResultsUpload\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x0e\n\x06weight\x18\x02 \x01(\x05\x12\x0c\n\x04task\x18\x03 \x01(\t\x12+\n\x06tensor\x18\x04 \x01(\x0b\x32\x19.openfl_proto.TensorProtoH\x00\x12\x0f\n\x05value\x18\x05 \x01(\x02H\x00\x12\x33\n\nvalue_dict\x18\x06 \x01(\x0b\x32\x1d.openfl_proto.ValueDictionaryH\x00\x12<\n\x0flist_value_dict\x18\x07 \x01(\x0b\x32!.openfl_proto.ListValueDictionaryH\x00\x42\x07\n\x05\x65xtra\"9\n\nJobRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\"J\n\x1bRoundSummaryDownloadRequest\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\"L\n\x0cRoundSummary\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x0f\n\x07summary\x18\x02 \x01(\t\"f\n\x0cGlobalTensor\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12)\n\x06tensor\x18\x02 \x01(\x0b\x32\x19.openfl_proto.TensorProto\"\xbd\x01\n\x08JobReply\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x1e\n\x03job\x18\x02 \x01(\x0e\x32\x11.openfl_proto.Job\x12\x38\n\x10\x65xtra_model_info\x18\x03 \x01(\x0b\x32\x1c.openfl_proto.ExtraModelInfoH\x00\x12\x0e\n\x04name\x18\x04 \x01(\tH\x00\x12\x11\n\x07seconds\x18\x05 \x01(\x05H\x00\x42\x07\n\x05\x65xtra\"P\n\nResultsAck\x12+\n\x06header\x18\x01 \x01(\x0b\x32\x1b.openfl_proto.MessageHeader\x12\x15\n\rdiscard_round\x18\x02 \x01(\x08\"v\n\x11LegacyTensorProto\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x12\n\ndata_bytes\x18\x03 \x01(\x0c\x12?\n\x14transformer_metadata\x18\x04 \x03(\x0b\x32!.openfl_proto.LegacyMetadataProto\"^\n\x11LegacyModelHeader\x12\n\n\x02id\x18\x01 \x01(\t\x12\x10\n\x08is_delta\x18\x02 \x01(\x08\x12\x1a\n\x12\x64\x65lta_from_version\x18\x03 \x01(\x05\x12\x0f\n\x07version\x18\x04 \x01(\x05\"u\n\x10LegacyModelProto\x12/\n\x06header\x18\x01 \x01(\x0b\x32\x1f.openfl_proto.LegacyModelHeader\x12\x30\n\x07tensors\x18\x02 \x03(\x0b\x32\x1f.openfl_proto.LegacyTensorProto\"\xb6\x01\n\x13LegacyMetadataProto\x12G\n\x0cint_to_float\x18\x01 \x03(\x0b\x32\x31.openfl_proto.LegacyMetadataProto.IntToFloatEntry\x12\x10\n\x08int_list\x18\x02 \x03(\x05\x12\x11\n\tbool_list\x18\x03 \x03(\x08\x1a\x31\n\x0fIntToFloatEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01*R\n\x03Job\x12\x16\n\x12JOB_DOWNLOAD_MODEL\x10\x00\x12\x16\n\x12JOB_UPLOAD_RESULTS\x10\x01\x12\r\n\tJOB_SLEEP\x10\x02\x12\x0c\n\x08JOB_QUIT\x10\x03\x32\xcd\x02\n\nAggregator\x12@\n\nRequestJob\x12\x18.openfl_proto.JobRequest\x1a\x16.openfl_proto.JobReply\"\x00\x12S\n\x0e\x44ownloadTensor\x12#.openfl_proto.TensorDownloadRequest\x1a\x18.openfl_proto.DataStream\"\x00\x30\x01\x12G\n\rUploadResults\x12\x18.openfl_proto.DataStream\x1a\x18.openfl_proto.ResultsAck\"\x00(\x01\x12_\n\x14\x44ownloadRoundSummary\x12).openfl_proto.RoundSummaryDownloadRequest\x1a\x1a.openfl_proto.RoundSummary\"\x00\x62\x06proto3')
 )
 
 _JOB = _descriptor.EnumDescriptor(
@@ -48,8 +48,8 @@ _JOB = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2265,
-  serialized_end=2347,
+  serialized_start=2260,
+  serialized_end=2342,
 )
 _sym_db.RegisterEnumDescriptor(_JOB)
 
@@ -355,7 +355,7 @@ _FLOATLIST = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='float_list', full_name='openfl_proto.FloatList.float_list', index=0,
+      name='value', full_name='openfl_proto.FloatList.value', index=0,
       number=1, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -374,7 +374,7 @@ _FLOATLIST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=567,
-  serialized_end=598,
+  serialized_end=593,
 )
 
 
@@ -411,8 +411,8 @@ _LISTVALUEDICTIONARY_LISTDICTIONARYENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=704,
-  serialized_end=782,
+  serialized_start=699,
+  serialized_end=777,
 )
 
 _LISTVALUEDICTIONARY = _descriptor.Descriptor(
@@ -441,8 +441,8 @@ _LISTVALUEDICTIONARY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=601,
-  serialized_end=782,
+  serialized_start=596,
+  serialized_end=777,
 )
 
 
@@ -479,8 +479,8 @@ _TENSORDOWNLOADREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=784,
-  serialized_end=873,
+  serialized_start=779,
+  serialized_end=868,
 )
 
 
@@ -555,8 +555,8 @@ _RESULTSUPLOAD = _descriptor.Descriptor(
       name='extra', full_name='openfl_proto.ResultsUpload.extra',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=876,
-  serialized_end=1152,
+  serialized_start=871,
+  serialized_end=1147,
 )
 
 
@@ -586,8 +586,8 @@ _JOBREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1154,
-  serialized_end=1211,
+  serialized_start=1149,
+  serialized_end=1206,
 )
 
 
@@ -617,8 +617,8 @@ _ROUNDSUMMARYDOWNLOADREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1213,
-  serialized_end=1287,
+  serialized_start=1208,
+  serialized_end=1282,
 )
 
 
@@ -655,8 +655,8 @@ _ROUNDSUMMARY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1289,
-  serialized_end=1365,
+  serialized_start=1284,
+  serialized_end=1360,
 )
 
 
@@ -693,8 +693,8 @@ _GLOBALTENSOR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1367,
-  serialized_end=1469,
+  serialized_start=1362,
+  serialized_end=1464,
 )
 
 
@@ -755,8 +755,8 @@ _JOBREPLY = _descriptor.Descriptor(
       name='extra', full_name='openfl_proto.JobReply.extra',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1472,
-  serialized_end=1661,
+  serialized_start=1467,
+  serialized_end=1656,
 )
 
 
@@ -793,8 +793,8 @@ _RESULTSACK = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1663,
-  serialized_end=1743,
+  serialized_start=1658,
+  serialized_end=1738,
 )
 
 
@@ -838,8 +838,8 @@ _LEGACYTENSORPROTO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1745,
-  serialized_end=1863,
+  serialized_start=1740,
+  serialized_end=1858,
 )
 
 
@@ -890,8 +890,8 @@ _LEGACYMODELHEADER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1865,
-  serialized_end=1959,
+  serialized_start=1860,
+  serialized_end=1954,
 )
 
 
@@ -928,8 +928,8 @@ _LEGACYMODELPROTO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1961,
-  serialized_end=2078,
+  serialized_start=1956,
+  serialized_end=2073,
 )
 
 
@@ -966,8 +966,8 @@ _LEGACYMETADATAPROTO_INTTOFLOATENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2214,
-  serialized_end=2263,
+  serialized_start=2209,
+  serialized_end=2258,
 )
 
 _LEGACYMETADATAPROTO = _descriptor.Descriptor(
@@ -1010,8 +1010,8 @@ _LEGACYMETADATAPROTO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2081,
-  serialized_end=2263,
+  serialized_start=2076,
+  serialized_end=2258,
 )
 
 _MESSAGEHEADER.fields_by_name['model_header'].message_type = _MODELHEADER
@@ -1258,8 +1258,8 @@ _AGGREGATOR = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=2350,
-  serialized_end=2683,
+  serialized_start=2345,
+  serialized_end=2678,
   methods=[
   _descriptor.MethodDescriptor(
     name='RequestJob',

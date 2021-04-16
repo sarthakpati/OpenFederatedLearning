@@ -414,7 +414,7 @@ class Aggregator(object):
 
         # if this is for our special print task, simply log each entry in the uploaded dictionary
         if message.task == "___RESERVED_PRINT_TASK_STRING___":
-            value = dict(message.value_dict.dictionary)
+            value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
             self.logger.info("Received brats stats results for {} of {}".format(collaborator, value))
             return ResultsAck(header=self.create_reply_header(message), discard_round=False)
 
@@ -430,6 +430,8 @@ class Aggregator(object):
                 value = tensor_proto_to_numpy_array(message.tensor)
             elif message.WhichOneof("extra") == 'value_dict':
                 value = dict(message.value_dict.dictionary)
+            elif message.WhichOneof("extra") == 'list_value_dict':
+                value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
             else:
                 value = message.value
 
