@@ -141,7 +141,7 @@ class Aggregator(object):
             t_hash = hash_string(t)
             tensor_proto = load_proto(os.path.join(directory, '{}.pbuf'.format(t_hash)), proto_type=TensorProto)
             if t != tensor_proto.name:
-                raise RuntimeError("Loaded the wrong tensor! Meant to load: {} did load: {} read file: {}".format(t, tensor.name, t_hash))
+                raise RuntimeError("Loaded the wrong tensor! Meant to load: {} did load: {} read file: {}".format(t, tensor_proto.name, t_hash))
             self.tensors[t] = tensor_proto_to_numpy_array(tensor_proto)
 
     def save_model(self, directory):
@@ -159,7 +159,7 @@ class Aggregator(object):
         os.makedirs(directory, exist_ok=True)
 
         t_hash = hash_string(result.task)
-        dump_proto(proto, os.path.join(directory, '{}.pbuf'.format(t_hash)))
+        dump_proto(result, os.path.join(directory, '{}.pbuf'.format(t_hash)))
 
     def initialize_round_results(self):
         self.round_results = RoundTaskResults(self.collaborator_common_names, self.tasks, self.logger, self.metrics_tasks)
@@ -323,7 +323,7 @@ class Aggregator(object):
 
         # if configured, also save to the backup location
         if self.backup_path is not None:
-            self.save_model(os.join(self.backup_path, str(self.round_num)))
+            self.save_model(os.path.join(self.backup_path, str(self.round_num)))
 
         # get the model score
         model_score = self.round_results.task_results[self.best_model_metric].value
@@ -337,10 +337,10 @@ class Aggregator(object):
         elif isinstance(model_score, dict):
             if self.model_selection_val_keys is not None:
                 these_model_subscores = [val for key, val in model_score.items() if key in self.model_selection_val_keys]
-                best_model_subscores = [val for key, val in best_model_score.items() if key in self.model_selection_val_keys]
+                best_model_subscores = [val for key, val in self.best_model_score.items() if key in self.model_selection_val_keys]
             else:
-                these_model_subscores = list(model_scores.values())
-                best_model_subscores = list(best_model_scores.values())
+                these_model_subscores = list(model_score.values())
+                best_model_subscores = list(self.best_model_score.values())
             new_best_model = np.average(these_model_subscores) > np.average(best_model_subscores)
         else:
             new_best_model = model_score > self.best_model_score
@@ -385,7 +385,7 @@ class Aggregator(object):
 
         self._do_quit = self._GRACEFULLY_QUIT
 
-    def _synchronized(func):
+    def _synchronized(self, func):
         def wrapper(self, *args, **kwargs):
             self.mutex.acquire(blocking=True)
             try:
