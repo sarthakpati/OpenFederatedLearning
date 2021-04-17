@@ -78,6 +78,7 @@ class Collaborator(object):
                  num_retries=5,
                  brats_stats_upload_filepath=None,
                  local_outputs_savings_interval=None,
+                 local_outputs_directory=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.channel = channel
@@ -106,6 +107,7 @@ class Collaborator(object):
         # if not None, determines how frequently (round interval) that both pre and post train validation 
         # outputs are saved to disc
         self.local_outputs_savings_interval = local_outputs_savings_interval
+        self.local_outputs_directory = local_outputs_directory
 
         self.wrapped_model = wrapped_model
         self.tensor_dict_split_fn_kwargs = wrapped_model.tensor_dict_split_fn_kwargs or {}
@@ -406,12 +408,12 @@ class Collaborator(object):
         Runs the validation of the model on the local dataset.
         """
         self.logger.info("{} - Beginning {}".format(self, result_name))
-        if self.local_outputs_savings_interval is not None:
-            if collaborator.model_header.version % self.local_outputs_savings_interval == 0:
-                results = self.wrapped_model.validate_and_save_outputs(model_id=collaborator.model_header.id, model_version=collaborator.model_header.version)
-            else:
-                results = self.wrapped_model.validate()
-        else:        
+        if (self.local_outputs_savings_interval is not None) and (self.model_header.version % self.local_outputs_savings_interval == 0):
+            results = self.wrapped_model.validate(save_outputs=True, 
+                                                  model_id=self.model_header.id, 
+                                                  model_version=self.model_header.version, 
+                                                  local_outputs_directory=self.local_outputs_directory)
+        else:
             results = self.wrapped_model.validate()
         self.logger.info("{} - Completed {}".format(self, result_name))
         data_size = self.wrapped_model.get_validation_data_size()
