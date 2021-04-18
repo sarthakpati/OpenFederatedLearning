@@ -31,7 +31,7 @@ def federate(flplan,
     data_objects = {collaborator_common_name: create_data_object(flplan, collaborator_common_name, local_config)  for collaborator_common_name in collaborator_common_names}
 
     # for simulation we create multiple directories under the local_outputs_direcotry (one for each collaborator)
-    local_outputs_directories = {name: os.path.join(local_outputs_directory, name) for name in collaborator_common_names}
+    local_outputs_directories = {name: os.path.join(local_outputs_directory, 'model_outputs_for_' + name) for name in collaborator_common_names}
     for dir_name in local_outputs_directories.values():
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
