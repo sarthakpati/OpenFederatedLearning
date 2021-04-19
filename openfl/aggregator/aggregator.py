@@ -412,7 +412,7 @@ class Aggregator(object):
 
         # if this is for our special print task, simply log each entry in the uploaded dictionary
         if message.task == "___RESERVED_PRINT_TASK_STRING___":
-            value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
+            value = dict(message.value_dict.dictionary)
             self.logger.info("Received brats stats results for {} of {}".format(collaborator, value))
             return ResultsAck(header=self.create_reply_header(message), discard_round=False)
 
