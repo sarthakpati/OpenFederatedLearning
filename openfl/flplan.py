@@ -212,7 +212,8 @@ def create_collaborator_object_from_flplan(flplan,
                                            compression_pipeline=None,
                                            network_object=None,
                                            model_device=None,
-                                           brats_stats_upload_filepath=None):
+                                           brats_stats_upload_filepath=None, 
+                                           local_outputs_directory=None):
     if data_object is None:
         if data_dir is None:
             data_object = create_data_object(flplan, collaborator_common_name, local_config)
@@ -243,7 +244,8 @@ def create_collaborator_object_from_flplan(flplan,
                         channel=network_object,
                         compression_pipeline=compression_pipeline,
                         single_col_cert_common_name=single_col_cert_common_name,
-                        brats_stats_upload_filepath=brats_stats_upload_filepath,
+                        brats_stats_upload_filepath=brats_stats_upload_filepath, 
+                        local_outputs_directory=local_outputs_directory,
                         **flplan['collaborator_object_init']['init_kwargs'])
 
 

@@ -35,7 +35,8 @@ def main(plan,
          kmp_affinity_flag,
          logging_config_path, 
          logging_default_level, 
-         logging_directory, 
+         logging_directory,
+         local_outputs_directory, 
          model_device, 
          **kwargs):
     """Run the federation simulation from the federation (FL) plan.
@@ -58,6 +59,11 @@ def main(plan,
         kmp_affinity_flag               : controls a model init kwarg
         logging_config_path             : The log file
         logging_default_level           : The log level
+        logging_directory               : directory in which to log
+        local_outputs_directory         : directory to which local model outputs will be stored for both local
+                                          and global model valiations every so many epochs determined in the flplan
+                                          (if None, will be assigned as logging directory)
+        model_device                    : 'cpu' or 'cuda'
         **kwargs                        : Variable parameters to pass to the function
 
     """
@@ -72,6 +78,9 @@ def main(plan,
     collaborators_dir = os.path.join(base_dir, 'collaborator_lists')
     logging_config_path = os.path.join(script_dir, logging_config_path)
     logging_directory = os.path.join(script_dir, logging_directory)
+
+    if local_outputs_directory is None:
+        local_outputs_directory = logging_directory
 
     setup_logging(path=logging_config_path, default_level=logging_default_level, logging_directory=logging_directory)
 
@@ -103,7 +112,8 @@ def main(plan,
              base_dir=base_dir,
              weights_dir=weights_dir,
              metadata_dir=metadata_dir,
-             model_device=model_device)
+             model_device=model_device, 
+             local_outputs_directory=local_outputs_directory)
 
 
 if __name__ == '__main__':
@@ -122,6 +132,7 @@ if __name__ == '__main__':
     parser.add_argument('--logging_config_path', '-lcp', type=str, default="logging.yaml")
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
+    parser.add_argument('--local_outputs_directory', '-lod', type=str, default=None)
     # FIXME: this kind of commandline configuration needs to be done in a consistent way
     parser.add_argument('--model_device', '-md', type=str, default='cpu')
     args = parser.parse_args()

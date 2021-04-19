@@ -39,7 +39,8 @@ def main(plan,
          logging_default_level, 
          logging_directory, 
          model_device,
-         brats_stats_upload_filepath):
+         brats_stats_upload_filepath, 
+         local_outputs_directory):
     """Runs the collaborator client process from the federation (FL) plan
 
     Args:
@@ -57,6 +58,10 @@ def main(plan,
         logging_config_fname            : The log file
         logging_default_level           : The log level
         model_device                    : gets passed to model 'init' function as "device"
+        brats_stats_upload_filepath     : 
+        local_outputs_directory         : directory to which local model outputs will be stored for both local
+                                          and global model valiations every so many epochs determined in the flplan
+                                          (if None, will be assigned as logging directory)
     """
     # FIXME: consistent filesystem (#15)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -66,6 +71,9 @@ def main(plan,
     metadata_dir = os.path.join(base_dir, 'metadata')
     logging_config_path = os.path.join(script_dir, logging_config_path)
     logging_directory = os.path.join(script_dir, logging_directory)
+
+    if local_outputs_directory is None:
+        local_outputs_directory = logging_directory
 
     setup_logging(path=logging_config_path, default_level=logging_default_level, logging_directory=logging_directory)
     
@@ -96,7 +104,8 @@ def main(plan,
                                                             single_col_cert_common_name,
                                                             data_dir=data_dir,
                                                             model_device=model_device,
-                                                            brats_stats_upload_filepath=brats_stats_upload_filepath)
+                                                            brats_stats_upload_filepath=brats_stats_upload_filepath, 
+                                                            local_outputs_directory = local_outputs_directory)
 
         collaborator.run()
         sys.exit(0)
@@ -127,5 +136,6 @@ if __name__ == '__main__':
     # FIXME: this kind of commandline configuration needs to be done in a consistent way
     parser.add_argument('--model_device', '-md', type=str, default='cpu')
     parser.add_argument('--brats_stats_upload_filepath', '-bsuf', type=str, default=None)
+    parser.add_argument('--local_outputs_directory', '-lod', type=str, default=None)
     args = parser.parse_args()
     main(**vars(args))

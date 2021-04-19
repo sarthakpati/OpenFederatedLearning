@@ -37,21 +37,22 @@ class Aggregator(object):
     """An Aggregator is the central node in federated learning.
 
     Args:
-        aggregator_uuid (string)                : UUID of this object.
-        federation_uuid (string)                : Federation UUID.
-        collaborator_common_names (list of str) : The list of approved collaborator IDs. These IDs should match the common_names in the collaborator certificates, unless "single_col_cert_common_name" is specified.
-        init_model_fpath (string)               : The filepath of the initial weights file.
-        latest_model_fpath (string)             : The filepath to store the latest aggregated weights
-        best_model_fpath (string)               : The filepath to store the weight of the best model.
-        rounds_to_train (int)                   : Number of rounds to train (default: 256)
-        minimum_reporting (int)                 : Aggregator will not end a round early until this number of clients has reported in. (default: -1)
-        straggler_cutoff_time (scalar)          : Aggregator will not end a round early until this number of seconds has passed. (default: np.inf)
-        single_col_cert_common_name (string)    : (default: None)
-        compression_pipeline                    : (default: None)
-        init_metadata_fname (string)            : (default: None)
-        latest_metadata_fname (string)          : (default: None)
-        send_metadata_to_clients (bool)         : (default: False)
-        kwargs                                  : Currently unused
+        aggregator_uuid (string)                    : UUID of this object.
+        federation_uuid (string)                    : Federation UUID.
+        collaborator_common_names (list of str)     : The list of approved collaborator IDs. These IDs should match the common_names in the collaborator certificates, unless "single_col_cert_common_name" is specified.
+        init_model_fpath (string)                   : The filepath of the initial weights file.
+        latest_model_fpath (string)                 : The filepath to store the latest aggregated weights
+        best_model_fpath (string)                   : The filepath to store the weight of the best model.
+        rounds_to_train (int)                       : Number of rounds to train (default: 256)
+        minimum_reporting (int)                     : Aggregator will not end a round early until this number of clients has reported in. (default: -1)
+        straggler_cutoff_time (scalar)              : Aggregator will not end a round early until this number of seconds has passed. (default: np.inf)
+        single_col_cert_common_name (string)        : (default: None)
+        compression_pipeline                        : (default: None)
+        init_metadata_fname (string)                : (default: None)
+        latest_metadata_fname (string)              : (default: None)
+        send_metadata_to_clients (bool)             : (default: False)
+        model_selection_val_keys (list of string)   : (default: None)
+        kwargs                                      : Currently unused
     """
     # FIXME: no selector logic is in place
     def __init__(self,
@@ -72,6 +73,7 @@ class Aggregator(object):
                  collaborator_sleep_time=10,
                  best_model_metric='shared_model_validation',
                  enrollment_period=np.inf,
+                 model_selection_val_keys=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.uuid = aggregator_uuid
@@ -88,6 +90,8 @@ class Aggregator(object):
         self.collaborator_sleep_time = collaborator_sleep_time
         self.enrollment_period = enrollment_period
         self.enrolled = []
+
+        self.model_selection_val_keys = model_selection_val_keys
 
         self.backup_path = backup_path
         self.runtime_aggregator_config_dir = runtime_aggregator_config_dir
@@ -137,7 +141,7 @@ class Aggregator(object):
             t_hash = hash_string(t)
             tensor_proto = load_proto(os.path.join(directory, '{}.pbuf'.format(t_hash)), proto_type=TensorProto)
             if t != tensor_proto.name:
-                raise RuntimeError("Loaded the wrong tensor! Meant to load: {} did load: {} read file: {}".format(t, tensor.name, t_hash))
+                raise RuntimeError("Loaded the wrong tensor! Meant to load: {} did load: {} read file: {}".format(t, tensor_proto.name, t_hash))
             self.tensors[t] = tensor_proto_to_numpy_array(tensor_proto)
 
     def save_model(self, directory):
@@ -155,7 +159,7 @@ class Aggregator(object):
         os.makedirs(directory, exist_ok=True)
 
         t_hash = hash_string(result.task)
-        dump_proto(proto, os.path.join(directory, '{}.pbuf'.format(t_hash)))
+        dump_proto(result, os.path.join(directory, '{}.pbuf'.format(t_hash)))
 
     def initialize_round_results(self):
         self.round_results = RoundTaskResults(self.collaborator_common_names, self.tasks, self.logger, self.metrics_tasks)
@@ -319,19 +323,19 @@ class Aggregator(object):
 
         # if configured, also save to the backup location
         if self.backup_path is not None:
-            self.save_model(os.join(self.backup_path, str(self.round_num)))
+            self.save_model(os.path.join(self.backup_path, str(self.round_num)))
 
         # get the model score
+        # if dictionary, we simply average their values (considering selection keys if appropriate)
         model_score = self.round_results.task_results[self.best_model_metric].value
         if isinstance(model_score, dict):
-            model_score = np.average(list(model_score.values()))
+            if self.model_selection_val_keys is not None:
+                model_subscores = [val for key, val in model_score.items() if key in self.model_selection_val_keys]
+                model_score = np.average(model_subscores)
 
         new_best_model = False
         if self.best_model_score is None:
             new_best_model = True
-        # if dictionary, we simply average their values
-        elif isinstance(model_score, dict):
-            new_best_model = np.average(list(model_score.values())) > np.average(list(self.best_model_score.values()))
         else:
             new_best_model = model_score > self.best_model_score
 
@@ -346,11 +350,12 @@ class Aggregator(object):
         self.round_summary = 'round: {}\n'.format(self.round_num)
         self.round_summary += 'round_start: {}\n'.format(self.round_start_time)
         if isinstance(self.best_model_score, dict):
-            self.round_summary += 'best_model_score:\n'
-            for k, v in self.best_model_score.items():
-                self.round_summary += '\t{}: {}'.format(k, v)
+            raise ValueError('Logical error, we should have replaced out all dictionary model_scores.')
         else:
-            self.round_summary += 'best_model_score: {}\n'.format(self.best_model_score)
+            if self.model_selection_val_keys is not None:
+                self.round_summary += 'best_model_score (according to keys: {}): {}\n'.format(self.model_selection_val_keys, self.best_model_score)
+            else:
+                self.round_summary += 'best_model_score: {}\n'.format(self.best_model_score)
 
         for k in self.metrics_tasks:
             t = self.round_results.task_results[k]
@@ -374,7 +379,7 @@ class Aggregator(object):
         self.round_start_time = None
 
         self._do_quit = self._GRACEFULLY_QUIT
-
+    
     def _synchronized(func):
         def wrapper(self, *args, **kwargs):
             self.mutex.acquire(blocking=True)
@@ -404,7 +409,7 @@ class Aggregator(object):
 
         # if this is for our special print task, simply log each entry in the uploaded dictionary
         if message.task == "___RESERVED_PRINT_TASK_STRING___":
-            value = dict(message.value_dict.dictionary)
+            value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
             self.logger.info("Received brats stats results for {} of {}".format(collaborator, value))
             return ResultsAck(header=self.create_reply_header(message), discard_round=False)
 
@@ -420,6 +425,8 @@ class Aggregator(object):
                 value = tensor_proto_to_numpy_array(message.tensor)
             elif message.WhichOneof("extra") == 'value_dict':
                 value = dict(message.value_dict.dictionary)
+            elif message.WhichOneof("extra") == 'list_value_dict':
+                value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
             else:
                 value = message.value
 
