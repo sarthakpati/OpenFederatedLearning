@@ -326,23 +326,16 @@ class Aggregator(object):
             self.save_model(os.path.join(self.backup_path, str(self.round_num)))
 
         # get the model score
+        # if dictionary, we simply average their values (considering selection keys if appropriate)
         model_score = self.round_results.task_results[self.best_model_metric].value
         if isinstance(model_score, dict):
-            print("DEBUG: model score is: ", np.average(list(model_score.values())) )
-            model_score = np.average(list(model_score.values()))
+            if self.model_selection_val_keys is not None:
+                model_subscores = [val for key, val in model_score.items() if key in self.model_selection_val_keys]
+                model_score = np.average(model_subscores)
 
         new_best_model = False
         if self.best_model_score is None:
             new_best_model = True
-        # if dictionary, we simply average their values (considering selection keys if appropriate)
-        elif isinstance(model_score, dict):
-            if self.model_selection_val_keys is not None:
-                these_model_subscores = [val for key, val in model_score.items() if key in self.model_selection_val_keys]
-                best_model_subscores = [val for key, val in self.best_model_score.items() if key in self.model_selection_val_keys]
-            else:
-                these_model_subscores = list(model_score.values())
-                best_model_subscores = list(self.best_model_score.values())
-            new_best_model = np.average(these_model_subscores) > np.average(best_model_subscores)
         else:
             new_best_model = model_score > self.best_model_score
 
@@ -357,11 +350,12 @@ class Aggregator(object):
         self.round_summary = 'round: {}\n'.format(self.round_num)
         self.round_summary += 'round_start: {}\n'.format(self.round_start_time)
         if isinstance(self.best_model_score, dict):
-            self.round_summary += 'best_model_score:\n'
-            for k, v in self.best_model_score.items():
-                self.round_summary += '\t{}: {}'.format(k, v)
+            raise ValueError('Logical error, we should have replaced out all dictionary model_scores.')
         else:
-            self.round_summary += 'best_model_score: {}\n'.format(self.best_model_score)
+            if self.model_selection_val_keys is not None:
+                self.round_summary += 'best_model_score (according to keys: {}): {}\n'.format(self.model_selection_val_keys, self.best_model_score)
+            else:
+                self.round_summary += 'best_model_score: {}\n'.format(self.best_model_score)
 
         for k in self.metrics_tasks:
             t = self.round_results.task_results[k]
