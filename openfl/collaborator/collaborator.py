@@ -141,14 +141,14 @@ class Collaborator(object):
                     for region, metrics in regions.items():
                         for metric, value in metrics.items():
                             key = "{}_{}_{}_{}".format(subject, model, region, metric)
-                            value = FloatList(float_list=[float(entry) for entry in value])
+                            value = float(value)
                             stats[key] = value
 
             # we send a results upload with a special task
             request = ResultsUpload(header=self.create_message_header(),
                                     weight=0,
                                     task='___RESERVED_PRINT_TASK_STRING___',
-                                    value_dict=ListValueDictionary(list_dictionary=stats))
+                                    value_dict=ValueDictionary(dictionary=stats))
 
             reply = self.channel.UploadResults(request)
             self.validate_header(reply)
