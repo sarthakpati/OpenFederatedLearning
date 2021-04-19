@@ -320,6 +320,8 @@ class Collaborator(object):
                                         weight=weight,
                                         task=task,
                                         value_dict=ValueDictionary(dictionary=result))
+            else:
+                raise NotImplementedError('No support at this time for uploading result that is not a float, dict of list, or dict of float.')
         else:
             request = ResultsUpload(header=self.create_message_header(),
                                     weight=weight,

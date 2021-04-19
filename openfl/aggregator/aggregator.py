@@ -332,7 +332,7 @@ class Aggregator(object):
             if self.model_selection_val_keys is not None:
                 model_subscores = [val for key, val in model_score.items() if key in self.model_selection_val_keys]
             else:
-                model_subscores = list(model_score.values()))
+                model_subscores = list(model_score.values())
             model_score = np.average(model_subscores)
 
         new_best_model = False
@@ -428,7 +428,9 @@ class Aggregator(object):
             elif message.WhichOneof("extra") == 'value_dict':
                 value = dict(message.value_dict.dictionary)
             elif message.WhichOneof("extra") == 'list_value_dict':
-                value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
+                per_example_value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
+                # TODO: Log the per_example values (provided above) using a second logger
+                value = {key: np.average(per_example_metric) for key, per_example_metric in per_example_value.items()}
             else:
                 value = message.value
 
