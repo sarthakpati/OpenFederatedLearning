@@ -27,7 +27,7 @@ handlers:
     stream: ext://sys.stdout
   agg_file_handler:
     class: logging.handlers.RotatingFileHandler
-    level: INFO
+    level: DEBUG
     formatter: simple
     filename: aggregator.log
     maxBytes: 10000000
