@@ -328,6 +328,7 @@ class Aggregator(object):
         # get the model score
         model_score = self.round_results.task_results[self.best_model_metric].value
         if isinstance(model_score, dict):
+            print("DEBUG: model score is: ", np.average(list(model_score.values())) )
             model_score = np.average(list(model_score.values()))
 
         new_best_model = False
