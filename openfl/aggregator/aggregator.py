@@ -331,7 +331,9 @@ class Aggregator(object):
         if isinstance(model_score, dict):
             if self.model_selection_val_keys is not None:
                 model_subscores = [val for key, val in model_score.items() if key in self.model_selection_val_keys]
-                model_score = np.average(model_subscores)
+            else:
+                model_subscores = list(model_score.values()))
+            model_score = np.average(model_subscores)
 
         new_best_model = False
         if self.best_model_score is None:
