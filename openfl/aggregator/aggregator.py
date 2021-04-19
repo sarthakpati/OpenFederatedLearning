@@ -76,6 +76,7 @@ class Aggregator(object):
                  model_selection_val_keys=None,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
+        self.per_example_validation_logger = logging.getLogger('openfl.per_example_validation')
         self.uuid = aggregator_uuid
         self.federation_uuid = federation_uuid
 
@@ -430,6 +431,11 @@ class Aggregator(object):
             elif message.WhichOneof("extra") == 'list_value_dict':
                 per_example_value = {key: message.list_value_dict.list_dictionary[key].value for key in message.list_value_dict.list_dictionary}
                 # TODO: Log the per_example values (provided above) using a second logger
+                readable_per_example_values = ''
+                for k, v in per_example_value.items():
+                    l = [str(x) for x in v]
+                    readable_per_example_values += '{} -\n\t{}\n'.format(k, '\n\t'.join(l))
+                self.per_example_validation_logger.info('{} per example results for task {} round {}:\n{}'.format(collaborator, task, self.round_num, readable_per_example_values))
                 value = {key: np.average(per_example_metric) for key, per_example_metric in per_example_value.items()}
             else:
                 value = message.value
