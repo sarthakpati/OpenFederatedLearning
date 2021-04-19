@@ -27,7 +27,7 @@ handlers:
     stream: ext://sys.stdout
   agg_file_handler:
     class: logging.handlers.RotatingFileHandler
-    level: INFO
+    level: DEBUG
     formatter: simple
     filename: aggregator.log
     maxBytes: 10000000
@@ -49,19 +49,31 @@ handlers:
     maxBytes: 10000000
     backupCount: 20
     encoding: utf8
+  per_example_file_handler:
+    class: logging.handlers.RotatingFileHandler
+    level: INFO
+    formatter: simple
+    filename: per_example_validation.log
+    maxBytes: 10000000
+    backupCount: 20
+    encoding: utf8
 
 loggers:
+  openfl.per_example_validation:
+    level: INFO
+    handlers: [per_example_file_handler]
+    propagate: no
   openfl.aggregator:
     level: INFO
-    handlers: [console, agg_file_handler]
+    handlers: [agg_file_handler]
     propagate: yes
   openfl.collaborator:
     level: INFO
-    handlers: [console, col_file_handler]
+    handlers: [col_file_handler]
     propagate: yes
   inference:
     level: INFO
-    handlers: [console, inference_file_handler]
+    handlers: [inference_file_handler]
     propagate: yes
   root:
     level: INFO
