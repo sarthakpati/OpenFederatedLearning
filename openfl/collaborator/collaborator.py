@@ -351,7 +351,8 @@ class Collaborator(object):
         elif task == 'local_model_validation':
             # sanity check that we have trained
             if not self.local_model_has_been_trained:
-                raise RuntimeError("Logic error! We should have trained!")
+                self.logger.info("Retraining for remaining results.")
+                self.do_train_task()
             self.do_validation_task('local_model_validation')
         else:
             # if we are here, we reported a loss, then crashed before we uploaded remaining tensors
