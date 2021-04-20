@@ -52,7 +52,7 @@ openfl_whl 				= dist/openfl-0.0.1-py3-none-any.whl
 openfl_pytorch_whl 		= dist/openfl.pytorch-0.0.1-py3-none-any.whl
 openfl_tensorflow_whl 	= dist/openfl.tensorflow-0.0.1-py3-none-any.whl
 fets_whl				= submodules/fets_ai/Algorithms/dist/fets-0.0.1-py3-none-any.whl
-gandlf_whl				= submodules/fets_ai/Algorithms/GANDLF/dist/GANDLF-0.0.7.dev0-py3-none-any.whl
+gandlf_whl				= submodules/fets_ai/Algorithms/GANDLF/dist/GANDLF-0.0.8-py3-none-any.whl
 
 # the python virtual env recipe
 $(venv):
