@@ -339,14 +339,16 @@ class Collaborator(object):
     def do_task(self, task):
         # FIXME: this should really not be hard-coded
         if task == 'shared_model_validation':
-            # sanity check that we have not trained
+            # we need to redownload, so we set our version to -1 and return
             if self.local_model_has_been_trained:
-                raise RuntimeError("Logic error! We should not have trained!")
+                self.model_header.version = -1
+                return
             self.do_validation_task('shared_model_validation')
         elif task == 'loss':
-            # sanity check that we have not trained
+            # we need to redownload, so we set our version to -1 and return
             if self.local_model_has_been_trained:
-                raise RuntimeError("Logic error! We should not have trained!")
+                self.model_header.version = -1
+                return
             self.do_train_task()
         elif task == 'local_model_validation':
             # sanity check that we have trained
