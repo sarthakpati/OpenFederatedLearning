@@ -435,7 +435,7 @@ class Aggregator(object):
                 for k, v in per_example_value.items():
                     l = [str(x) for x in v]
                     readable_per_example_values += '{} -\n\t{}\n'.format(k, '\n\t'.join(l))
-                self.per_example_validation_logger.info('{} per example results for task {} round {}:\n{}'.format(collaborator, task, self.round_num, readable_per_example_values))
+                self.per_example_validation_logger.info('{} per example results for task {} round {}:\n{}'.format(collaborator, task, message.header.model_header.version, readable_per_example_values))
                 value = {key: np.average(per_example_metric) for key, per_example_metric in per_example_value.items()}
             else:
                 value = message.value
