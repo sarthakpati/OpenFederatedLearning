@@ -401,6 +401,11 @@ class Collaborator(object):
         # get the trained tensor dict and store any designated to be held out from aggregation
         shared_tensors = self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
 
+        # check if we have nan values in the numpy arrays we are about to share
+        nan_info = {param_name: np.any(np.isnan(param)) for param_name, param in shared_tensors.values()}
+        if np.any(list(nan_info.values())):
+            raise ValueError('Training resulted in share model parameters with nan values. Dict of param key to has_nan: {}'.format(nan_info))
+
         # store each resulting tensor
         for k, v in shared_tensors.items():
             self.round_results[k] = (v, data_size)
