@@ -339,19 +339,22 @@ class Collaborator(object):
     def do_task(self, task):
         # FIXME: this should really not be hard-coded
         if task == 'shared_model_validation':
-            # sanity check that we have not trained
+            # we need to redownload, so we set our version to -1 and return
             if self.local_model_has_been_trained:
-                raise RuntimeError("Logic error! We should not have trained!")
+                self.model_header.version = -1
+                return
             self.do_validation_task('shared_model_validation')
         elif task == 'loss':
-            # sanity check that we have not trained
+            # we need to redownload, so we set our version to -1 and return
             if self.local_model_has_been_trained:
-                raise RuntimeError("Logic error! We should not have trained!")
+                self.model_header.version = -1
+                return
             self.do_train_task()
         elif task == 'local_model_validation':
             # sanity check that we have trained
             if not self.local_model_has_been_trained:
-                raise RuntimeError("Logic error! We should have trained!")
+                self.logger.info("Retraining for remaining results.")
+                self.do_train_task()
             self.do_validation_task('local_model_validation')
         else:
             # if we are here, we reported a loss, then crashed before we uploaded remaining tensors
@@ -397,6 +400,12 @@ class Collaborator(object):
 
         # get the trained tensor dict and store any designated to be held out from aggregation
         shared_tensors = self._remove_and_save_holdout_tensors(self.wrapped_model.get_tensor_dict(with_opt_vars=self._with_opt_vars()))
+
+        # check if we have nan values in the numpy arrays we are about to share
+        nan_info = {param_name: np.any(np.isnan(param)) for param_name, param in shared_tensors.items()}
+        nan_params = [key for key, value in nan_info.items() if value == True]
+        if len(nan_params) > 0:
+            raise ValueError('Training resulted in nan values within the following share model parameters: {}'.format(nan_params))
 
         # store each resulting tensor
         for k, v in shared_tensors.items():
