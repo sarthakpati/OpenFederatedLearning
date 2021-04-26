@@ -694,12 +694,39 @@ class StreamingAverage(object):
 
     def has_collaborator_done(self, collaborator):
         return collaborator in self.updated_by
-    
+
+    def _has_nans_inner(self, value):
+        try:
+            has_nans = np.isnan(value)
+        except Exception as e:
+            self.logger.critical("Failed isnan check for type {}".format(type(value)))
+            return False
+        try:
+            has_nans = np.any(has_nans)
+        except TypeError as te:
+            pass
+        return has_nans
+
+    def _has_nans(self, value):
+        if isinstance(value, dict):
+            for v in value.values():
+                if self._has_nans_inner(v):
+                    return True
+            return False
+        else:
+            return self._has_nans_inner(value)
+
     def update_from_collaborator(self, collaborator, value, weight):
         if self.has_collaborator_done(collaborator):
             return
 
         self.updated_by.append(collaborator)
+
+        # check if value contains nans
+        if self._has_nans(value):
+            self.logger.critical("NANs detected in results for {} from {}".format(self.name, collaborator))
+            return
+
         if self.value is None:
             self.value = value
             self.weight = weight
