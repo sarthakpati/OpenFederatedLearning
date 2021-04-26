@@ -57,6 +57,14 @@ handlers:
     maxBytes: 10000000
     backupCount: 20
     encoding: utf8
+ model_and_data_file_handler:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: simple
+    filename: model_and_data.log
+    maxBytes: 10000000
+    backupCount: 20
+    encoding: utf8 
 
 loggers:
   openfl.per_example_validation:
@@ -75,6 +83,10 @@ loggers:
     level: INFO
     handlers: [inference_file_handler]
     propagate: yes
+  openfl.model_and_data:
+    level: DEBUG
+    handlers: [model_and_data_file_handler]
+    propagate: no
   root:
     level: INFO
     handlers: [console]

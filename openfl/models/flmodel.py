@@ -49,10 +49,10 @@ class FLModel(object):
         self.tensor_dict_split_fn_kwargs = tensor_dict_split_fn_kwargs
 
 
-    def set_logger(self):
+    def set_logger(self, logger_name=__name__):
         """Sets up the log object
         """
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(logger_name)
 
     def get_data(self):
         """Get the data object.
