@@ -78,7 +78,8 @@ class Collaborator(object):
                  num_retries=5,
                  brats_stats_upload_filepath=None,
                  local_outputs_savings_interval=None,
-                 local_outputs_directory=None,
+                 local_outputs_directory=None, 
+                 no_local_outputs = False,
                  **kwargs):
         self.logger = logging.getLogger(__name__)
         self.channel = channel
@@ -103,6 +104,11 @@ class Collaborator(object):
         self.num_batches_per_round = num_batches_per_round
         if num_batches_per_round is not None:
             self.logger.info("Collaborator {} overriding epochs_per_round of {} with num_batches_per_round of {}".format(self.common_name, self.epochs_per_round, self.num_batches_per_round))
+
+        # regardless of the value of local_outputs_savings_interval, we do not save outputs if
+        # no_local_outputs is True
+        if no_local_outputs:
+            local_outputs_savings_interval = None
 
         # if not None, determines how frequently (round interval) that both pre and post train validation 
         # outputs are saved to disc

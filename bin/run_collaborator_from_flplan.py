@@ -40,7 +40,8 @@ def main(plan,
          logging_directory, 
          model_device,
          brats_stats_upload_filepath, 
-         local_outputs_directory):
+         local_outputs_directory, 
+         no_local_outputs):
     """Runs the collaborator client process from the federation (FL) plan
 
     Args:
@@ -62,6 +63,7 @@ def main(plan,
         local_outputs_directory         : directory to which local model outputs will be stored for both local
                                           and global model valiations every so many epochs determined in the flplan
                                           (if None, will be assigned as logging directory)
+        no_local_outputs_flag           : Flag that prevents local output savings to disk
     """
     # FIXME: consistent filesystem (#15)
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -105,7 +107,8 @@ def main(plan,
                                                             data_dir=data_dir,
                                                             model_device=model_device,
                                                             brats_stats_upload_filepath=brats_stats_upload_filepath, 
-                                                            local_outputs_directory = local_outputs_directory)
+                                                            local_outputs_directory = local_outputs_directory, 
+                                                            no_local_outputs = no_local_outputs_flag)
 
         collaborator.run()
         sys.exit(0)
@@ -137,5 +140,6 @@ if __name__ == '__main__':
     parser.add_argument('--model_device', '-md', type=str, default='cpu')
     parser.add_argument('--brats_stats_upload_filepath', '-bsuf', type=str, default=None)
     parser.add_argument('--local_outputs_directory', '-lod', type=str, default=None)
+    parser.add_argument('--no_local_outputs_flag', '-nlo', action='store_true')
     args = parser.parse_args()
     main(**vars(args))
