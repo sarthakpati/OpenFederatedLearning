@@ -298,7 +298,8 @@ class Aggregator(object):
 
     def end_of_round(self):
         # FIXME: proper logging of metrics
-        metrics_log_string = 'round results for model id/version {}/{}'.format(self.model_header.id, self.model_header.version) 
+        metrics_log_string = '\n**** END OF ROUND {} ****\n'.format(self.model_header.version)
+        metrics_log_string += 'round results for model id/version {}/{}'.format(self.model_header.id, self.model_header.version) 
         
         # FIXME: dictionary handling is wonky
         for metric in self.metrics_tasks:
