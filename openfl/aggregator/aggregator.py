@@ -306,7 +306,8 @@ class Aggregator(object):
             r = self.round_results.task_results[metric]
             if isinstance(r.value, dict):
                 metrics_log_string += '\n\t{}: total_samples: {}'.format(metric, r.weight)
-                for k, v in r.value.items():
+                for k in sorted(r.value.keys()):
+                    v = r.value[k]
                     metrics_log_string += '\n\t\t{}: {}'.format(k, v)
             else:
                 metrics_log_string += '\n\t{}: {}, total_samples: {}'.format(metric, r.value, r.weight)
