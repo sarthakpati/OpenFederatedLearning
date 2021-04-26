@@ -34,7 +34,7 @@ def federate(flplan,
     local_outputs_directories = {name: os.path.join(local_outputs_directory, 'model_outputs_for_' + name) for name in collaborator_common_names}
     for dir_name in local_outputs_directories.values():
         if not os.path.exists(dir_name):
-            os.mkdir(dir_name)
+            os.mkdirs(dir_name)
     
     # instantiate the model (using the first collaborator dataset for now)
     model = create_model_object(flplan, data_objects[collaborator_common_names[0]], model_device)
