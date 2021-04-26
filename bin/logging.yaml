@@ -57,7 +57,7 @@ handlers:
     maxBytes: 10000000
     backupCount: 20
     encoding: utf8
- model_and_data_file_handler:
+  model_and_data_file_handler:
     class: logging.handlers.RotatingFileHandler
     level: DEBUG
     formatter: simple
