@@ -675,7 +675,13 @@ class RoundTaskResults(object):
 
     def update_from_collaborator(self, collaborator, task, value, weight):
         if self.log_these is not None and self.logger is not None and task in self.log_these:
-            self.logger.info("Received update from {} for {} with value {} and weight {}".format(collaborator, task, value, weight))
+            if isinstance(value, dict):
+                message = "Received update from {} for {} with weight {} and values:".format(collaborator, task, weight)
+                for k in sorted(value.keys()):
+                    message += "\n\t{}: {}".format(k, value[k])
+                self.logger.info(message)
+            else:
+                self.logger.info("Received update from {} for {} with value {} and weight {}".format(collaborator, task, value, weight))
         self.task_results[task].update_from_collaborator(collaborator, value, weight)
     
     def get_tensor(self, tensor_name):
