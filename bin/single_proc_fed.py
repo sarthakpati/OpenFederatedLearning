@@ -25,7 +25,8 @@ def federate(flplan,
              weights_dir,
              metadata_dir,
              model_device, 
-             local_outputs_directory):   
+             local_outputs_directory, 
+             no_local_outputs):   
 
     # create the data objects for each collaborator
     data_objects = {collaborator_common_name: create_data_object(flplan, collaborator_common_name, local_config)  for collaborator_common_name in collaborator_common_names}
@@ -66,6 +67,7 @@ def federate(flplan,
                                                    weights_dir,
                                                    metadata_dir, 
                                                    local_outputs_directory=local_outputs_directories[collaborator_common_name],
+                                                   no_local_outputs=no_local_outputs,
                                                    data_object=data_objects[collaborator_common_name],
                                                    model_object=model,
                                                    compression_pipeline=compression_pipeline,

@@ -36,7 +36,8 @@ def main(plan,
          logging_config_path, 
          logging_default_level, 
          logging_directory,
-         local_outputs_directory, 
+         local_outputs_directory,
+         no_local_outputs_flag, 
          model_device, 
          **kwargs):
     """Run the federation simulation from the federation (FL) plan.
@@ -63,6 +64,7 @@ def main(plan,
         local_outputs_directory         : directory to which local model outputs will be stored for both local
                                           and global model valiations every so many epochs determined in the flplan
                                           (if None, will be assigned as logging directory)
+        no_local_outputs_flag           : Flag that prevents local output savings to disk
         model_device                    : 'cpu' or 'cuda'
         **kwargs                        : Variable parameters to pass to the function
 
@@ -113,7 +115,8 @@ def main(plan,
              weights_dir=weights_dir,
              metadata_dir=metadata_dir,
              model_device=model_device, 
-             local_outputs_directory=local_outputs_directory)
+             local_outputs_directory=local_outputs_directory, 
+             no_local_outputs=no_local_outputs_flag)
 
 
 if __name__ == '__main__':
@@ -133,6 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('--logging_default_level', '-l', type=str, default="info")
     parser.add_argument('--logging_directory', '-ld', type=str, default="logs")
     parser.add_argument('--local_outputs_directory', '-lod', type=str, default=None)
+    parser.add_argument('--no_local_outputs_flag', '-nlo', action='store_true')
     # FIXME: this kind of commandline configuration needs to be done in a consistent way
     parser.add_argument('--model_device', '-md', type=str, default='cpu')
     args = parser.parse_args()
