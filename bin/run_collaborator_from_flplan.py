@@ -41,7 +41,7 @@ def main(plan,
          model_device,
          brats_stats_upload_filepath, 
          local_outputs_directory, 
-         no_local_outputs):
+         no_local_outputs_flag):
     """Runs the collaborator client process from the federation (FL) plan
 
     Args:
