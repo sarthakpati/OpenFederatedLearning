@@ -298,17 +298,20 @@ class Aggregator(object):
 
     def end_of_round(self):
         # FIXME: proper logging of metrics
-        metrics_log_string = 'round results for model id/version {}/{}'.format(self.model_header.id, self.model_header.version) 
+        metrics_log_string = '\n**** END OF ROUND {} ****\n'.format(self.model_header.version)
+        metrics_log_string += 'round results for model id/version {}/{}'.format(self.model_header.id, self.model_header.version) 
         
         # FIXME: dictionary handling is wonky
         for metric in self.metrics_tasks:
             r = self.round_results.task_results[metric]
+            num_contributors = self.round_results.num_collaborators_done(task=metric)
             if isinstance(r.value, dict):
-                metrics_log_string += '\n\t{}: total_samples: {}'.format(metric, r.weight)
-                for k, v in r.value.items():
+                metrics_log_string += '\n\t{}: total_samples: {} num_contributors: {}'.format(metric, r.weight, num_contributors)
+                for k in sorted(r.value.keys()):
+                    v = r.value[k]
                     metrics_log_string += '\n\t\t{}: {}'.format(k, v)
             else:
-                metrics_log_string += '\n\t{}: {}, total_samples: {}'.format(metric, r.value, r.weight)
+                metrics_log_string += '\n\t{}: {}, total_samples: {} num_contributors: {}'.format(metric, r.value, r.weight, num_contributors)
         self.logger.info(metrics_log_string)
 
         # update the shared tensor values
@@ -673,7 +676,13 @@ class RoundTaskResults(object):
 
     def update_from_collaborator(self, collaborator, task, value, weight):
         if self.log_these is not None and self.logger is not None and task in self.log_these:
-            self.logger.info("Received update from {} for {} with value {} and weight {}".format(collaborator, task, value, weight))
+            if isinstance(value, dict):
+                message = "Received update from {} for {} with weight {} and values:".format(collaborator, task, weight)
+                for k in sorted(value.keys()):
+                    message += "\n\t{}: {}".format(k, value[k])
+                self.logger.info(message)
+            else:
+                self.logger.info("Received update from {} for {} with value {} and weight {}".format(collaborator, task, value, weight))
         self.task_results[task].update_from_collaborator(collaborator, value, weight)
     
     def get_tensor(self, tensor_name):
@@ -694,12 +703,39 @@ class StreamingAverage(object):
 
     def has_collaborator_done(self, collaborator):
         return collaborator in self.updated_by
-    
+
+    def _has_nans_inner(self, value):
+        try:
+            has_nans = np.isnan(value)
+        except Exception as e:
+            self.logger.critical("Failed isnan check for type {}".format(type(value)))
+            return False
+        try:
+            has_nans = np.any(has_nans)
+        except TypeError as te:
+            pass
+        return has_nans
+
+    def _has_nans(self, value):
+        if isinstance(value, dict):
+            for v in value.values():
+                if self._has_nans_inner(v):
+                    return True
+            return False
+        else:
+            return self._has_nans_inner(value)
+
     def update_from_collaborator(self, collaborator, value, weight):
         if self.has_collaborator_done(collaborator):
             return
 
         self.updated_by.append(collaborator)
+
+        # check if value contains nans
+        if self._has_nans(value):
+            self.logger.critical("NANs detected in results for {} from {}".format(self.name, collaborator))
+            return
+
         if self.value is None:
             self.value = value
             self.weight = weight
