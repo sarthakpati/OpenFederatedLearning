@@ -304,13 +304,14 @@ class Aggregator(object):
         # FIXME: dictionary handling is wonky
         for metric in self.metrics_tasks:
             r = self.round_results.task_results[metric]
+            num_contributors = self.round_results.num_collaborators_done(task=metric)
             if isinstance(r.value, dict):
-                metrics_log_string += '\n\t{}: total_samples: {}'.format(metric, r.weight)
+                metrics_log_string += '\n\t{}: total_samples: {} num_contributors: {}'.format(metric, r.weight, num_contributors)
                 for k in sorted(r.value.keys()):
                     v = r.value[k]
                     metrics_log_string += '\n\t\t{}: {}'.format(k, v)
             else:
-                metrics_log_string += '\n\t{}: {}, total_samples: {}'.format(metric, r.value, r.weight)
+                metrics_log_string += '\n\t{}: {}, total_samples: {} num_contributors: {}'.format(metric, r.value, r.weight, num_contributors)
         self.logger.info(metrics_log_string)
 
         # update the shared tensor values
